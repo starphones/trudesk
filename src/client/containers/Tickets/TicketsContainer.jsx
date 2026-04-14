@@ -326,7 +326,7 @@ class TicketsContainer extends React.Component {
             striped={true}
             headers={[
               <TableHeader key={0} width={45} height={50} component={selectAllCheckbox} />,
-              <TableHeader key={1} width={60} text={'Status'} />,
+              <TableHeader key={1} width={80} text={'Status'} />,
               <TableHeader key={2} width={65} text={'#'} />,
               <TableHeader key={3} width={'23%'} text={'Subject'} />,
               <TableHeader key={4} width={110} text={'Created'} />,
@@ -415,7 +415,7 @@ class TicketsContainer extends React.Component {
                         className={'uk-display-inline-block'}
                         style={{ backgroundColor: status == null ? '#000' : status.get('htmlColor') }}
                       >
-                        {status == null ? 'U' : status.get('name')[0].toUpperCase()}
+                        {status == null ? 'U' : status.get('name')}
                       </span>
                     </TableCell>
                     <TableCell className={'vam nbb'}>{ticket.get('uid')}</TableCell>
