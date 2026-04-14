@@ -23,6 +23,7 @@ var xss = require('xss')
 var sanitizeHtml = require('sanitize-html')
 
 var apiTickets = {}
+var WEBHOOK_APP_URL = 'https://primary-production-06d0.up.railway.app'
 
 function buildGraphData (arr, days, callback) {
   var graphData = []
@@ -1011,6 +1012,16 @@ apiTickets.postComment = function (req, res) {
           fullname: req.user.fullname,
           email: req.user.email
         }
+      }
+
+      const requestOrigin = req.get('origin') || ''
+      const requestReferer = req.get('referer') || ''
+      const requestSource = requestOrigin || requestReferer
+      const isWebhookSource = requestSource.indexOf(WEBHOOK_APP_URL) === 0
+
+      if (isWebhookSource) {
+        winston.info('Skipping outbound comment webhook for Ticket#' + tt.uid + ' because request came from webhook app.')
+        return res.json({ success: true, error: null, ticket: tt })
       }
 
       winston.info('Posting outbound comment webhook for Ticket#' + tt.uid)
