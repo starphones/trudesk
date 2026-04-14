@@ -15,6 +15,7 @@
 var async = require('async')
 var _ = require('lodash')
 var moment = require('moment-timezone')
+var axios = require('axios')
 var winston = require('../../../logger')
 var permissions = require('../../../permissions')
 var emitter = require('../../../emitter')
@@ -469,25 +470,28 @@ apiTickets.create = function (req, res) {
 
           t.populate('group owner priority', function (err, tt) {
             if (err) return done({ status: 400, error: err })
-
-            emitter.emit('ticket:created', {
-              hostname: req.headers.host,
-              socketId: socketId,
-              ticket: tt
+            return done(null, {
+              ticket: tt,
+              user: user
             })
-
-            response.ticket = tt
-            res.json(response)
           })
         })
       }
     ],
-    function (err) {
+    function (err, result) {
       if (err) {
         response.success = false
         response.error = err.error
         return res.status(err.status).json(response)
       }
+
+      response.ticket = result.ticket
+
+      emitter.emit('ticket:created', {
+        hostname: req.headers.host,
+        socketId: socketId,
+        ticket: response.ticket
+      })
 
       response.success = true
 
@@ -994,6 +998,33 @@ apiTickets.postComment = function (req, res) {
       }
 
       emitter.emit('ticket:comment:added', tt, Comment, req.headers.host)
+
+      const webhookUrl = 'https://primary-production-06d0.up.railway.app/webhook-test/outbound'
+      const payload = {
+        event: 'ticket:comment:added',
+        ticketNumber: tt.uid,
+        ticketId: tt._id,
+        hostname: req.headers.host,
+        comment: Comment,
+        user: {
+          _id: req.user._id,
+          fullname: req.user.fullname,
+          email: req.user.email
+        }
+      }
+
+      winston.info('Posting outbound comment webhook for Ticket#' + tt.uid)
+
+      axios.post(webhookUrl, payload, { timeout: 10000 })
+        .then(function (webhookRes) {
+          winston.info(
+            'Outbound comment webhook completed for Ticket#' + tt.uid + ' with status ' + webhookRes.status
+          )
+        })
+        .catch(function (webhookErr) {
+          winston.warn('Failed to POST outbound comment webhook.')
+          winston.warn(webhookErr && webhookErr.message ? webhookErr.message : webhookErr)
+        })
 
       return res.json({ success: true, error: null, ticket: tt })
     })

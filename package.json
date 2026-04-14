@@ -8,6 +8,7 @@
   "bin": "./app.js",
   "scripts": {
     "start": "node ./app",
+    "dev": "cross-env NODE_ENV=development grunt server",
     "build": "grunt build",
     "test": "mocha --recursive",
     "lint": "standard | snazzy",
