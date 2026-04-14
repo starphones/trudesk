@@ -999,7 +999,7 @@ apiTickets.postComment = function (req, res) {
 
       emitter.emit('ticket:comment:added', tt, Comment, req.headers.host)
 
-      const webhookUrl = 'https://primary-production-06d0.up.railway.app/webhook-test/outbound'
+      const webhookUrl = 'https://primary-production-06d0.up.railway.app/webhook/outbound'
       const payload = {
         event: 'ticket:comment:added',
         ticketNumber: tt.uid,
