@@ -843,6 +843,21 @@ apiTickets.update = function (req, res) {
             return cb()
           },
           function (cb) {
+            if (!_.isUndefined(reqTicket.staffname)) {
+              ticket.staffname = sanitizeHtml(reqTicket.staffname || '').trim()
+
+              var HistoryItem = {
+                action: 'ticket:set:staffname',
+                description: ticket.staffname ? ticket.staffname + ' was set as staff name' : 'Staff name was cleared',
+                owner: req.user._id
+              }
+
+              ticket.history.push(HistoryItem)
+            }
+
+            return cb()
+          },
+          function (cb) {
             if (!_.isUndefined(reqTicket.assignee) && !_.isNull(reqTicket.assignee)) {
               ticket.assignee = reqTicket.assignee
               ticket.populate('assignee', function (err, t) {

@@ -24,6 +24,7 @@ api.dashboard = {}
 api.dashboard.getData = payload => {
   const timespan = payload.timespan || 30
   return axios.get(`/api/v1/tickets/stats/${timespan}`).then(res => {
+    console.log(res.data,'asdasd')
     return res.data
   })
 }
@@ -205,6 +206,13 @@ api.tickets.transferToThirdParty = ({ uid }) => {
 
 api.tickets.fetchTicketTypes = () => {
   return axios.get('/api/v2/tickets/info/types').then(res => {
+    return res.data
+  })
+}
+
+api.tickets.fetchStaffs = ({ state } = {}) => {
+  const query = state ? `?state=${encodeURIComponent(state)}` : ''
+  return axios.get(`/api/v1/staffs${query}`).then(res => {
     return res.data
   })
 }

@@ -564,7 +564,7 @@ ticketsController.uploadImageMDE = function (req, res) {
   busboy.on('file', function (name, file, info) {
     const filename = info.filename
     const mimetype = info.mimeType
-    if (mimetype.indexOf('image/') === -1) {
+    if (mimetype.indexOf('image/') === -1 && mimetype.indexOf('application/pdf') === -1) {
       error = {
         status: 500,
         message: 'Invalid File Type'
@@ -589,7 +589,8 @@ ticketsController.uploadImageMDE = function (req, res) {
       '.bmp',
       '.dib',
       '.heif',
-      '.heic'
+      '.heic',
+      '.pdf'
     ]
 
     if (!allowedExtensions.includes(ext.toLocaleLowerCase())) {

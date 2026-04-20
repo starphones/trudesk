@@ -42,6 +42,7 @@ class IssuePartial extends React.Component {
   @observable owner = null
   @observable subject = ''
   @observable issue = ''
+  @observable ticketState = ''
   @observable attachments = []
 
   constructor (props) {
@@ -53,6 +54,7 @@ class IssuePartial extends React.Component {
     this.owner = this.props.owner
     this.subject = this.props.subject
     this.issue = this.props.issue
+    this.ticketState = this.props.ticketState || ''
     this.attachments = this.props.attachments
 
     this.onUpdateTicketAttachments = this.onUpdateTicketAttachments.bind(this)
@@ -71,6 +73,7 @@ class IssuePartial extends React.Component {
     if (prevProps.owner !== this.props.owner) this.owner = this.props.owner
     if (prevProps.subject !== this.props.subject) this.subject = this.props.subject
     if (prevProps.issue !== this.props.issue) this.issue = this.props.issue
+    if (prevProps.ticketState !== this.props.ticketState) this.ticketState = this.props.ticketState || ''
     if (prevProps.attachments !== this.props.attachments) this.attachments = this.props.attachments
   }
 
@@ -136,6 +139,12 @@ class IssuePartial extends React.Component {
           <time dateTime={helpers.formatDate(this.props.date, 'YYYY-MM-DD HH:mm')}>
             {helpers.formatDate(this.props.date, this.props.dateFormat)}
           </time>
+          {this.ticketState && (
+            <Fragment>
+              <br />
+              <span>State: {this.ticketState}</span>
+            </Fragment>
+          )}
           <br />
           {/* Attachments */}
           <ul className='attachments'>
@@ -209,6 +218,7 @@ IssuePartial.propTypes = {
   owner: PropTypes.object.isRequired,
   subject: PropTypes.string.isRequired,
   issue: PropTypes.string.isRequired,
+  ticketState: PropTypes.string,
   date: PropTypes.string.isRequired,
   dateFormat: PropTypes.string.isRequired,
   attachments: PropTypes.array,

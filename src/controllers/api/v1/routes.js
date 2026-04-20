@@ -112,6 +112,9 @@ module.exports = function (middleware, router, controllers) {
   router.put('/api/v1/tags/:id', apiv1, isAgentOrAdmin, apiCtrl.tags.updateTag)
   router.delete('/api/v1/tags/:id', apiv1, isAgentOrAdmin, apiCtrl.tags.deleteTag)
 
+  // Staffs
+  router.get('/api/v1/staffs', apiv1, apiCtrl.staffs.get)
+
   // Public Tickets
   const checkCaptcha = middleware.checkCaptcha
   const checkOrigin = middleware.checkOrigin

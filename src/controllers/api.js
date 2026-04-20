@@ -22,6 +22,7 @@ const apiGroupsV1 = require('./api/v1/groups')
 const apiReportsV1 = require('./api/v1/reports')
 const apiSettingsV1 = require('./api/v1/settings')
 const apiPluginsV1 = require('./api/v1/plugins')
+const apiStaffsV1 = require('./api/v1/staffs')
 
 const apiController = {}
 
@@ -40,6 +41,7 @@ apiController.v1.groups = apiGroupsV1
 apiController.v1.reports = apiReportsV1
 apiController.v1.settings = apiSettingsV1
 apiController.v1.plugins = apiPluginsV1
+apiController.v1.staffs = apiStaffsV1
 apiController.v1.roles = require('./api/v1/roles')
 
 apiController.v2 = {}
