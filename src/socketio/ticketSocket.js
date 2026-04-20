@@ -13,6 +13,7 @@
  */
 var _ = require('lodash')
 var async = require('async')
+var axios = require('axios')
 var winston = require('../logger')
 var marked = require('marked')
 var sanitizeHtml = require('sanitize-html')
@@ -27,6 +28,8 @@ var permissions = require('../permissions')
 var xss = require('xss')
 
 var events = {}
+var WEBHOOK_APP_URL = 'https://primary-production-06d0.up.railway.app'
+var FOR_REFUND_WEBHOOK_URL = WEBHOOK_APP_URL + '/webhook/notification'
 
 function register (socket) {
   events.onUpdateTicketGrid(socket)
@@ -62,6 +65,7 @@ events.onUpdateTicketStatus = socket => {
     // winston.debug('Received Status')
     try {
       let ticket = await ticketSchema.getTicketById(ticketId)
+      const previousStatusName = _.get(ticket, 'status.name', '')
       ticket = await ticket.setStatus(ownerId, status)
       ticket = await ticket.save()
       ticket = await ticket.populate('status')
@@ -72,6 +76,31 @@ events.onUpdateTicketStatus = socket => {
         owner: ticket.owner,
         status: ticket.status
       })
+
+      const nextStatusName = _.get(ticket, 'status.name', '')
+      const becameForRefund =
+        previousStatusName.toLowerCase() !== 'for refund' && nextStatusName.toLowerCase() === 'for refund'
+
+      if (becameForRefund) {
+        const payload = {
+          event: 'ticket-status-for-refund',
+          ticketId: ticket._id,
+          ticketNumber: ticket.uid,
+          status: nextStatusName
+        }
+
+        axios
+          .post(FOR_REFUND_WEBHOOK_URL, payload, { timeout: 10000 })
+          .then(function (webhookRes) {
+            winston.info(
+              'For Refund webhook completed for Ticket#' + ticket.uid + ' with status ' + webhookRes.status
+            )
+          })
+          .catch(function (webhookErr) {
+            winston.warn('Failed to POST For Refund webhook for Ticket#' + ticket.uid)
+            winston.warn(webhookErr && webhookErr.message ? webhookErr.message : webhookErr)
+          })
+      }
     } catch (e) {
       winston.debug(e)
       winston.log('info', 'Error in Status' + JSON.stringify(e))
