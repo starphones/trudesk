@@ -964,81 +964,106 @@ apiTickets.postComment = function (req, res) {
 
   if (_.isUndefined(ticketId)) return res.status(400).json({ success: false, error: 'Invalid Post Data' })
   var ticketModel = require('../../../models/ticket')
+  var ticketStatusModel = require('../../../models/ticketStatus')
   ticketModel.getTicketById(ticketId, function (err, t) {
     if (err) return res.status(400).json({ success: false, error: 'Invalid Post Data' })
 
     if (_.isUndefined(comment)) return res.status(400).json({ success: false, error: 'Invalid Post Data' })
 
-    var marked = require('marked')
-    marked.setOptions({
-      breaks: true
-    })
+    const saveComment = function () {
+      var marked = require('marked')
+      marked.setOptions({
+        breaks: true
+      })
 
-    comment = sanitizeHtml(comment).trim()
+      comment = sanitizeHtml(comment).trim()
 
-    var Comment = {
-      owner: owner,
-      date: new Date(),
-      comment: xss(marked.parse(comment))
-    }
-
-    t.updated = Date.now()
-    t.comments.push(Comment)
-    var HistoryItem = {
-      action: 'ticket:comment:added',
-      description: 'Comment was added',
-      owner: owner
-    }
-    t.history.push(HistoryItem)
-
-    t.save(function (err, tt) {
-      if (err) return res.status(400).json({ success: false, error: err.message })
-
-      if (!permissions.canThis(req.user.role, 'tickets:notes')) {
-        tt.notes = []
+      var Comment = {
+        owner: owner,
+        date: new Date(),
+        comment: xss(marked.parse(comment))
       }
 
-      emitter.emit('ticket:comment:added', tt, Comment, req.headers.host)
+      t.updated = Date.now()
+      t.comments.push(Comment)
+      var HistoryItem = {
+        action: 'ticket:comment:added',
+        description: 'Comment was added',
+        owner: owner
+      }
+      t.history.push(HistoryItem)
 
-      const webhookUrl = 'https://primary-production-06d0.up.railway.app/webhook/outbound'
-      const payload = {
-        event: 'ticket:comment:added',
-        ticketNumber: tt.uid,
-        ticketId: tt._id,
-        hostname: req.headers.host,
-        comment: Comment,
-        user: {
-          _id: req.user._id,
-          fullname: req.user.fullname,
-          email: req.user.email
+      t.save(function (err, tt) {
+        if (err) return res.status(400).json({ success: false, error: err.message })
+
+        if (!permissions.canThis(req.user.role, 'tickets:notes')) {
+          tt.notes = []
         }
-      }
 
-      const requestOrigin = req.get('origin') || ''
-      const requestReferer = req.get('referer') || ''
-      const requestSource = requestOrigin || requestReferer
-      const isWebhookSource = requestSource.indexOf(WEBHOOK_APP_URL) === 0
+        emitter.emit('ticket:comment:added', tt, Comment, req.headers.host)
 
-      if (isWebhookSource) {
-        winston.info('Skipping outbound comment webhook for Ticket#' + tt.uid + ' because request came from webhook app.')
+        const webhookUrl = 'https://primary-production-06d0.up.railway.app/webhook/outbound'
+        const payload = {
+          event: 'ticket:comment:added',
+          ticketNumber: tt.uid,
+          ticketId: tt._id,
+          hostname: req.headers.host,
+          comment: Comment,
+          user: {
+            _id: req.user._id,
+            fullname: req.user.fullname,
+            email: req.user.email
+          }
+        }
+
+        const requestOrigin = req.get('origin') || ''
+        const requestReferer = req.get('referer') || ''
+        const requestSource = requestOrigin || requestReferer
+        const isWebhookSource = requestSource.indexOf(WEBHOOK_APP_URL) === 0
+
+        if (isWebhookSource) {
+          winston.info('Skipping outbound comment webhook for Ticket#' + tt.uid + ' because request came from webhook app.')
+          return res.json({ success: true, error: null, ticket: tt })
+        }
+
+        winston.info('Posting outbound comment webhook for Ticket#' + tt.uid)
+
+        axios.post(webhookUrl, payload, { timeout: 10000 })
+          .then(function (webhookRes) {
+            winston.info(
+              'Outbound comment webhook completed for Ticket#' + tt.uid + ' with status ' + webhookRes.status
+            )
+          })
+          .catch(function (webhookErr) {
+            winston.warn('Failed to POST outbound comment webhook.')
+            winston.warn(webhookErr && webhookErr.message ? webhookErr.message : webhookErr)
+          })
+
         return res.json({ success: true, error: null, ticket: tt })
-      }
+      })
+    }
 
-      winston.info('Posting outbound comment webhook for Ticket#' + tt.uid)
+    if (_.get(t, 'status.isResolved')) {
+      ticketStatusModel
+        .find({ isResolved: false })
+        .sort({ order: 1 })
+        .exec(function (statusErr, statuses) {
+          if (statusErr) {
+            winston.warn(statusErr)
+            return saveComment()
+          }
 
-      axios.post(webhookUrl, payload, { timeout: 10000 })
-        .then(function (webhookRes) {
-          winston.info(
-            'Outbound comment webhook completed for Ticket#' + tt.uid + ' with status ' + webhookRes.status
-          )
+          if (_.isEmpty(statuses)) return saveComment()
+
+          const nextStatus = _.head(statuses)
+          t.setStatus(owner, nextStatus._id, function (setStatusErr) {
+            if (setStatusErr) winston.warn(setStatusErr)
+            return saveComment()
+          })
         })
-        .catch(function (webhookErr) {
-          winston.warn('Failed to POST outbound comment webhook.')
-          winston.warn(webhookErr && webhookErr.message ? webhookErr.message : webhookErr)
-        })
-
-      return res.json({ success: true, error: null, ticket: tt })
-    })
+    } else {
+      return saveComment()
+    }
   })
 }
 
