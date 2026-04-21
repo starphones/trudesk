@@ -54,6 +54,8 @@ class TicketsContainer extends React.Component {
   @observable searchTerm = ''
 
   selectedTickets = []
+  ticketSeenMap = {}
+  seenStorageKey = 'trudesk:tickets:seenMap'
   constructor (props) {
     super(props)
     makeObservable(this)
@@ -63,7 +65,49 @@ class TicketsContainer extends React.Component {
     this.onTicketDeleted = this.onTicketDeleted.bind(this)
   }
 
+  getTicketUpdatedAt (ticket) {
+    return ticket.get('updated') || ticket.get('date')
+  }
+
+  loadSeenMap () {
+    try {
+      const raw = localStorage.getItem(this.seenStorageKey)
+      this.ticketSeenMap = raw ? JSON.parse(raw) : {}
+    } catch (e) {
+      this.ticketSeenMap = {}
+    }
+  }
+
+  persistSeenMap () {
+    try {
+      localStorage.setItem(this.seenStorageKey, JSON.stringify(this.ticketSeenMap))
+    } catch (e) {
+      // Ignore storage write errors
+    }
+  }
+
+  markTicketSeen (ticket) {
+    const ticketId = ticket.get('_id')
+    const updatedAt = this.getTicketUpdatedAt(ticket)
+    if (!ticketId || !updatedAt) return
+
+    this.ticketSeenMap[ticketId] = updatedAt
+    this.persistSeenMap()
+  }
+
+  hasUnreadUpdate (ticket) {
+    const ticketId = ticket.get('_id')
+    const updatedAt = this.getTicketUpdatedAt(ticket)
+    const seenAt = this.ticketSeenMap[ticketId]
+
+    if (!updatedAt) return false
+    if (!seenAt) return Boolean(ticket.get('updated'))
+
+    return moment(updatedAt).isAfter(moment(seenAt))
+  }
+
   componentDidMount () {
+    this.loadSeenMap()
     this.props.socket.on('$trudesk:client:ticket:created', this.onTicketCreated)
     this.props.socket.on('$trudesk:client:ticket:updated', this.onTicketUpdated)
     this.props.socket.on('$trudesk:client:ticket:deleted', this.onTicketDeleted)
@@ -348,6 +392,7 @@ class TicketsContainer extends React.Component {
             {!this.props.loading &&
               this.props.tickets.map(ticket => {
                 const status = this.props.ticketStatuses.find(s => s.get('_id') === ticket.get('status').get('_id'))
+                const unreadUpdate = this.hasUnreadUpdate(ticket)
 
                 const assignee = () => {
                   const a = ticket.get('assignee')
@@ -388,6 +433,7 @@ class TicketsContainer extends React.Component {
                       const td = e.target.closest('td')
                       const input = td.getElementsByTagName('input')
                       if (input.length > 0) return false
+                      this.markTicketSeen(ticket)
                       History.pushState(null, `Ticket-${ticket.get('uid')}`, `/tickets/${ticket.get('uid')}`)
                     }}
                   >
@@ -419,7 +465,9 @@ class TicketsContainer extends React.Component {
                       </span>
                     </TableCell>
                     <TableCell className={'vam nbb'}>{ticket.get('uid')}</TableCell>
-                    <TableCell className={'vam nbb'}>{ticket.get('subject')}</TableCell>
+                    <TableCell className={'vam nbb'} style={{ fontWeight: unreadUpdate ? 700 : 400 }}>
+                      {ticket.get('subject')}
+                    </TableCell>
                     <TableCell className={'vam nbb'}>
                       {helpers.formatDate(ticket.get('date'), helpers.getShortDateFormat())}
                     </TableCell>
@@ -427,7 +475,9 @@ class TicketsContainer extends React.Component {
                     <TableCell className={'vam nbb'}>{ticket.getIn(['group', 'name'])}</TableCell>
                     <TableCell className={'vam nbb'}>{assignee()}</TableCell>
                     <TableCell className={'vam nbb'}>{dueDate}</TableCell>
-                    <TableCell className={'vam nbb'}>{updated}</TableCell>
+                    <TableCell className={'vam nbb'} style={{ fontWeight: unreadUpdate ? 700 : 400 }}>
+                      {updated}
+                    </TableCell>
                   </TableRow>
                 )
               })}
