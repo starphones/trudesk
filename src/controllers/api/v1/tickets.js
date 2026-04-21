@@ -888,6 +888,50 @@ apiTickets.update = function (req, res) {
 }
 
 /**
+ * @api {put} /api/v1/tickets/:id/status Update Ticket Status
+ * @apiName updateTicketStatusById
+ * @apiDescription Updates status for a single ticket
+ * @apiVersion 0.1.0
+ * @apiGroup Ticket
+ * @apiHeader {string} accesstoken The access token for the logged in user
+ *
+ * @apiParamExample {json} Request:
+ * {
+ *      "status": "{StatusObjectId}"
+ * }
+ */
+apiTickets.updateTicketStatusById = function (req, res) {
+  const ticketId = req.params.id
+  const statusId = req.body.status || req.body.statusId || req.body.value
+  const ownerId = req.user && req.user._id
+
+  if (_.isUndefined(ticketId) || _.isUndefined(statusId) || _.isUndefined(ownerId)) {
+    return res.status(400).json({ success: false, error: 'Invalid Request Data' })
+  }
+
+  const ticketModel = require('../../../models/ticket')
+  ticketModel.getTicketByUid(ticketId, function (err, ticket) {
+    if (err) return res.status(400).json({ success: false, error: err.message })
+    if (!ticket) return res.status(400).json({ success: false, error: 'Unable to locate ticket. Aborting...' })
+
+    ticket
+      .setStatus(ownerId, statusId)
+      .then(function (updatedTicket) {
+        return updatedTicket.save()
+      })
+      .then(function (savedTicket) {
+        return savedTicket.populate('status')
+      })
+      .then(function (savedTicket) {
+        return res.json({ success: true, error: null, ticket: savedTicket })
+      })
+      .catch(function (setStatusErr) {
+        return res.status(400).json({ success: false, error: setStatusErr.message || setStatusErr })
+      })
+  })
+}
+
+/**
  * @api {delete} /api/v1/tickets/:id Delete Ticket
  * @apiName deleteTicket
  * @apiDescription Deletes ticket via given OID
@@ -939,11 +983,11 @@ apiTickets.delete = function (req, res) {
  *      -l http://localhost/api/v1/tickets/addcomment
  *
  * @apiParamExample {json} Request:
- * {
- *      "comment": "Comment Text",
- *      "owner": {OwnerId},
- *      "ticketid": {TicketId}
- * }
+  * {
+  *      "comment": "Comment Text",
+  *      "owner": {OwnerId},
+  *      "ticketid": {TicketId}
+  * }
  *
  * @apiSuccess {boolean} success Successful
  * @apiSuccess {string} error Error if occurrred
