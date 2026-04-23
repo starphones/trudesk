@@ -105,6 +105,7 @@ const ticketSchema = mongoose.Schema({
     required: true
   },
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'tags', autopopulate: true }],
+  staffname: { type: String, default: '' },
   subject: { type: String, required: true },
   issue: { type: String, required: true },
   closedDate: { type: Date },

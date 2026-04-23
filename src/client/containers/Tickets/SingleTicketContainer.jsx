@@ -54,6 +54,7 @@ import TruTabSelector from 'components/TruTabs/TruTabSelector'
 import TruTabSelectors from 'components/TruTabs/TruTabSelectors'
 import TruTabWrapper from 'components/TruTabs/TruTabWrapper'
 
+import api from 'api'
 import axios from 'axios'
 import helpers from 'lib/helpers'
 import Log from '../../logger'
@@ -61,14 +62,67 @@ import UIkit from 'uikit'
 import moment from 'moment'
 import SpinLoader from 'components/SpinLoader'
 
+const AU_STATE_VALUES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
+
+const extractStateFromIssue = issue => {
+  if (!issue) return ''
+
+  let issueText = issue
+  if (typeof document !== 'undefined') {
+    const tempEl = document.createElement('div')
+    tempEl.innerHTML = issue
+
+    tempEl.querySelectorAll('br').forEach(br => {
+      br.replaceWith('\n')
+    })
+
+    tempEl.querySelectorAll('p, div, li').forEach(el => {
+      if (el.nextSibling) el.insertAdjacentText('afterend', '\n')
+    })
+
+    issueText = tempEl.textContent || tempEl.innerText || ''
+  }
+
+  const normalizedText = issueText.replace(/\s+/g, ' ').trim()
+  const inlineStateMatch = normalizedText.match(
+    /state\s*[:=]\s*(.+?)(?=\s*(store|ticket type|subject|proof of purchase|issue experienced|message)\s*[:=]|$)/i
+  )
+
+  if (inlineStateMatch && inlineStateMatch[1]) {
+    const inlineStateValue = inlineStateMatch[1].trim()
+    const matchedStateCode = AU_STATE_VALUES.find(stateValue => inlineStateValue.toUpperCase().startsWith(stateValue))
+
+    if (matchedStateCode) return matchedStateCode
+
+    return inlineStateValue
+  }
+
+  const issueLines = issueText
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  const stateLine = issueLines.find(line => /^state\s*:/i.test(line))
+  if (!stateLine) return ''
+
+  const stateValue = stateLine.replace(/^state\s*:/i, '').trim()
+  const matchedStateCode = AU_STATE_VALUES.find(value => stateValue.toUpperCase().startsWith(value))
+
+  if (matchedStateCode) return matchedStateCode
+
+  return stateValue
+}
+
 const fetchTicket = parent => {
   axios
     .get(`/api/v2/tickets/${parent.props.ticketUid}`)
     .then(res => {
       // setTimeout(() => {
       parent.ticket = res.data.ticket
+      parent.selectedStaffname = (parent.ticket && parent.ticket.staffname) || ''
       parent.isSubscribed =
         parent.ticket && parent.ticket.subscribers.findIndex(i => i._id === parent.props.shared.sessionUser._id) !== -1
+      parent.loadStaffs(extractStateFromIssue(parent.ticket && parent.ticket.issue))
       // }, 3000)
     })
     .catch(error => {
@@ -92,6 +146,9 @@ const showPriorityConfirm = () => {
 class SingleTicketContainer extends React.Component {
   @observable ticket = null
   @observable isSubscribed = false
+  @observable staffs = []
+  @observable selectedStaffname = ''
+  @observable ticketState = ''
   assigneeDropdownPartial = createRef()
 
   constructor (props) {
@@ -168,6 +225,9 @@ class SingleTicketContainer extends React.Component {
   onUpdateTicket (data) {
     if (this.ticket._id === data._id) {
       this.ticket = data
+      this.selectedStaffname = data.staffname || ''
+      this.ticketState = extractStateFromIssue(data.issue)
+      this.loadStaffs(this.ticketState)
     }
   }
 
@@ -205,6 +265,38 @@ class SingleTicketContainer extends React.Component {
 
   onUpdateTicketTags (data) {
     if (this.ticket._id === data._id) this.ticket.tags = data.tags
+  }
+
+  loadStaffs (state) {
+    this.ticketState = state || ''
+
+    api.tickets
+      .fetchStaffs({ state })
+      .then(res => {
+        this.staffs = res && res.staffs ? res.staffs : []
+      })
+      .catch(error => {
+        Log.error(error.response || error)
+        this.staffs = []
+      })
+  }
+
+  onStaffnameChanged (e) {
+    const staffname = e.target.value
+    this.selectedStaffname = staffname
+
+    axios
+      .put(`/api/v1/tickets/${this.ticket._id}`, { staffname })
+      .then(res => {
+        if (res && res.data && res.data.success && res.data.ticket) {
+          this.ticket = res.data.ticket
+          this.selectedStaffname = res.data.ticket.staffname || ''
+        }
+      })
+      .catch(error => {
+        Log.error(error.response || error)
+        helpers.UI.showSnackbar(error, true)
+      })
   }
 
   onCommentNoteSubmit (e, type) {
@@ -463,6 +555,20 @@ class SingleTicketContainer extends React.Component {
                           )}
                           {!hasTicketUpdate && <div className={'input-box'}>{this.ticket.group.name}</div>}
                         </div>
+                        <div className='uk-width-1-1 nopadding uk-clearfix'>
+                          <span>Staff Name</span>
+                          {hasTicketUpdate && (
+                            <select value={this.selectedStaffname || ''} onChange={e => this.onStaffnameChanged(e)}>
+                              <option value=''>Select Staff Name</option>
+                              {this.staffs.map(staff => (
+                                <option key={staff._id} value={staff.staffname}>
+                                  {staff.staffname}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {!hasTicketUpdate && <div className={'input-box'}>{this.selectedStaffname || '--'}</div>}
+                        </div>
                         {/*  Due Date */}
                         <div className='uk-width-1-1 p-0'>
                           <span>Due Date</span> {hasTicketUpdate && <span>-&nbsp;</span>}
@@ -636,6 +742,7 @@ class SingleTicketContainer extends React.Component {
                       owner={this.ticket.owner}
                       subject={this.ticket.subject}
                       issue={this.ticket.issue}
+                      ticketState={this.ticketState}
                       date={this.ticket.date}
                       dateFormat={`${this.props.common.get('longDateFormat')}, ${this.props.common.get('timeFormat')}`}
                       attachments={this.ticket.attachments}
