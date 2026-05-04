@@ -232,6 +232,7 @@ ticketsController.filter = function (req, res, next) {
   let tags = queryString.tag
   let assignee = queryString.au
   let ticketStates = queryString.ts
+  let staffnames = queryString.sn
 
   const rawNoPage = req.originalUrl.replace(/[?&]page=[^&#]*(#.*)?$/, '$1').replace(/([?&])page=[^&]*&/, '$1')
 
@@ -249,6 +250,8 @@ ticketsController.filter = function (req, res, next) {
   if (!_.isUndefined(assignee) && !_.isArray(assignee)) assignee = [assignee]
   if (!_.isUndefined(ticketStates)) ticketStates = xss(ticketStates)
   if (!_.isUndefined(ticketStates) && !_.isArray(ticketStates)) ticketStates = [ticketStates]
+  if (!_.isUndefined(staffnames)) staffnames = xss(staffnames)
+  if (!_.isUndefined(staffnames) && !_.isArray(staffnames)) staffnames = [staffnames]
 
   const filter = {
     uid: uid,
@@ -265,6 +268,7 @@ ticketsController.filter = function (req, res, next) {
     types: types,
     assignee: assignee,
     ticketStates: ticketStates,
+    staffnames: staffnames,
     raw: rawNoPage
   }
 
