@@ -945,6 +945,9 @@ function buildQueryWithObject (SELF, grpId, object, count) {
     // State Filter
     if (object.filter.ticketStates) query.where({ countryState: { $in: object.filter.ticketStates } })
 
+    // Staff Name Filter
+    if (object.filter.staffnames) query.where({ staffname: { $in: object.filter.staffnames } })
+
     // Unassigned Filter
     if (object.filter.unassigned) query.where({ assignee: { $exists: false } })
 

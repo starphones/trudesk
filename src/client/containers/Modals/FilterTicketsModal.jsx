@@ -17,12 +17,12 @@ import { each } from 'lodash'
 import { connect } from 'react-redux'
 import { hideModal } from 'actions/common'
 import { fetchGroups, unloadGroups } from 'actions/groups'
-import { fetchAccounts, unloadAccounts } from 'actions/accounts'
 import { getTagsWithPage, fetchTicketTypes, fetchTicketStatus } from 'actions/tickets'
 
 import BaseModal from 'containers/Modals/BaseModal'
 import SingleSelect from 'components/SingleSelect'
 import Button from 'components/Button'
+import api from 'api'
 
 import helpers from 'lib/helpers'
 
@@ -31,15 +31,31 @@ const AU_STATE_VALUES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
 class FilterTicketsModal extends React.Component {
   constructor (props) {
     super(props)
+
+    this.state = {
+      allStaffs: [],
+      staffs: []
+    }
+
+    this.onTicketStateFilterChanged = this.onTicketStateFilterChanged.bind(this)
+    this.updateStaffOptions = this.updateStaffOptions.bind(this)
   }
 
   componentDidMount () {
     helpers.UI.inputs()
     this.props.fetchGroups()
-    this.props.fetchAccounts({ page: 0, limit: -1, type: 'agents', showDeleted: false })
     this.props.getTagsWithPage({ limit: -1 })
     this.props.fetchTicketTypes()
     this.props.fetchTicketStatus()
+    api.tickets
+      .fetchStaffs()
+      .then(res => {
+        const staffs = res && res.staffs ? res.staffs : []
+        this.setState({ allStaffs: staffs, staffs: staffs })
+      })
+      .catch(() => {
+        this.setState({ allStaffs: [], staffs: [] })
+      })
   }
 
   componentDidUpdate () {
@@ -48,26 +64,42 @@ class FilterTicketsModal extends React.Component {
 
   componentWillUnmount () {
     this.props.unloadGroups()
-    this.props.unloadAccounts()
+  }
+
+  onTicketStateFilterChanged (e, values) {
+    const selectedStates = Array.isArray(values) ? values : values ? [values] : []
+    this.updateStaffOptions(selectedStates)
+  }
+
+  updateStaffOptions (selectedStates) {
+    if (!selectedStates || selectedStates.length === 0) {
+      this.setState({ staffs: this.state.allStaffs })
+      return
+    }
+
+    const normalizedStates = selectedStates.map(s => String(s).toLowerCase().trim())
+    const staffs = this.state.allStaffs.filter(staff => normalizedStates.includes(String(staff.state || '').toLowerCase().trim()))
+
+    this.setState({ staffs: staffs })
   }
 
   onSubmit (e) {
     e.preventDefault()
     const startDate = e.target.filterDate_Start.value
     const endDate = e.target.filterDate_End.value
-    const subject = e.target.subject.value
     const statuses = this.statusSelect.value
     const tags = this.tagsSelect.value
     const types = this.typesSelect.value
-    const groups = this.groupSelect.value
-    const assignees = this.assigneeSelect.value
     const ticketStates = this.ticketStateSelect.value
+    const staffnames = (this.staffSelect && this.staffSelect.value) || []
+    const staffnameOptions = this.state.staffs.map(s => s.staffname)
+    const selectedStaffnames = (Array.isArray(staffnames) ? staffnames : [staffnames]).filter(s =>
+      staffnameOptions.includes(s)
+    )
 
     let queryString = '?f=1'
     if (startDate) queryString += `&ds=${startDate}`
     if (endDate) queryString += `&de=${endDate}`
-
-    if (subject) queryString += `&fs=${subject}`
 
     each(statuses, i => {
       queryString += `&st=${i}`
@@ -81,16 +113,12 @@ class FilterTicketsModal extends React.Component {
       queryString += `&tag=${i}`
     })
 
-    each(groups, i => {
-      queryString += `&gp=${i}`
-    })
-
-    each(assignees, i => {
-      queryString += `&au=${i}`
-    })
-
     each(ticketStates, i => {
       queryString += `&ts=${i}`
+    })
+
+    each(selectedStaffnames, i => {
+      queryString += `&sn=${encodeURIComponent(i)}`
     })
 
     History.pushState(null, null, `/tickets/filter/${queryString}&r=${Math.floor(Math.random() * (99999 - 1 + 1)) + 1}`)
@@ -112,28 +140,13 @@ class FilterTicketsModal extends React.Component {
       })
       .toArray()
 
-    const groups = this.props.groupsState.groups
-      .map(g => {
-        return { text: g.get('name'), value: g.get('_id') }
-      })
-      .toArray()
-
-    const assignees = this.props.accountsState.accounts
-      .map(a => {
-        return { text: a.get('fullname'), value: a.get('_id') }
-      })
-      .toArray()
-
     const ticketStates = AU_STATE_VALUES.map(state => ({ text: state, value: state }))
+    const staffs = this.state.staffs.map(staff => ({ text: staff.staffname, value: staff.staffname }))
 
     return (
       <BaseModal options={{ bgclose: false }}>
         <h2 style={{ marginBottom: 20 }}>Ticket Filter</h2>
         <form className={'uk-form-stacked'} onSubmit={e => this.onSubmit(e)}>
-          <div className='uk-margin-medium-bottom'>
-            <label>Subject</label>
-            <input type='text' name={'subject'} className={'md-input'} />
-          </div>
           <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
             <div className='uk-width-1-2' style={{ padding: '0 15px 0 0' }}>
               <label htmlFor='filterDate_Start' className='uk-form-label nopadding nomargin'>
@@ -171,7 +184,7 @@ class FilterTicketsModal extends React.Component {
           <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
             <div className='uk-width-1-1'>
               <label htmlFor='filterStatus' className='uk-form-label' style={{ paddingBottom: 0, marginBottom: 0 }}>
-                Ticket Tags
+                Store Tags
               </label>
               <SingleSelect items={tags} showTextbox={true} multiple={true} ref={r => (this.tagsSelect = r)} />
             </div>
@@ -187,19 +200,6 @@ class FilterTicketsModal extends React.Component {
           <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
             <div className='uk-width-1-1'>
               <label htmlFor='filterStatus' className='uk-form-label' style={{ paddingBottom: 0, marginBottom: 0 }}>
-                Assignee
-              </label>
-              <SingleSelect
-                items={assignees}
-                showTextbox={false}
-                multiple={true}
-                ref={r => (this.assigneeSelect = r)}
-              />
-            </div>
-          </div>
-          <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
-            <div className='uk-width-1-1'>
-              <label htmlFor='filterStatus' className='uk-form-label' style={{ paddingBottom: 0, marginBottom: 0 }}>
                 State
               </label>
               <SingleSelect
@@ -207,15 +207,21 @@ class FilterTicketsModal extends React.Component {
                 showTextbox={false}
                 multiple={true}
                 ref={r => (this.ticketStateSelect = r)}
+                onSelectChange={this.onTicketStateFilterChanged}
               />
             </div>
           </div>
           <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
             <div className='uk-width-1-1'>
               <label htmlFor='filterStatus' className='uk-form-label' style={{ paddingBottom: 0, marginBottom: 0 }}>
-                Groups
+                Staff Name
               </label>
-              <SingleSelect items={groups} showTextbox={false} multiple={true} ref={r => (this.groupSelect = r)} />
+              <SingleSelect
+                items={staffs}
+                showTextbox={true}
+                multiple={true}
+                ref={r => (this.staffSelect = r)}
+              />
             </div>
           </div>
           <div className='uk-modal-footer uk-text-right'>
@@ -231,12 +237,9 @@ class FilterTicketsModal extends React.Component {
 FilterTicketsModal.propTypes = {
   viewdata: PropTypes.object.isRequired,
   groupsState: PropTypes.object.isRequired,
-  accountsState: PropTypes.object.isRequired,
   hideModal: PropTypes.func.isRequired,
   fetchGroups: PropTypes.func.isRequired,
   unloadGroups: PropTypes.func.isRequired,
-  fetchAccounts: PropTypes.func.isRequired,
-  unloadAccounts: PropTypes.func.isRequired,
   getTagsWithPage: PropTypes.func.isRequired,
   ticketTags: PropTypes.object.isRequired,
   fetchTicketTypes: PropTypes.func.isRequired,
@@ -248,7 +251,6 @@ FilterTicketsModal.propTypes = {
 const mapStateToProps = state => ({
   viewdata: state.common.viewdata,
   groupsState: state.groupsState,
-  accountsState: state.accountsState,
   ticketTags: state.tagsSettings.tags,
   ticketTypes: state.ticketsState.types,
   ticketStatuses: state.ticketsState.ticketStatuses
@@ -258,8 +260,6 @@ export default connect(mapStateToProps, {
   hideModal,
   fetchGroups,
   unloadGroups,
-  fetchAccounts,
-  unloadAccounts,
   getTagsWithPage,
   fetchTicketTypes,
   fetchTicketStatus
