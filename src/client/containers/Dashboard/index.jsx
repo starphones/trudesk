@@ -22,10 +22,12 @@ import PeityBar from 'components/Peity/peity-bar'
 import PeityPie from 'components/Peity/peity-pie'
 import PeityLine from 'components/Peity/peity-line'
 import MGraph from 'components/MGraph'
-import D3Pie from 'components/D3/d3pie'
+import D3Pie from 'components/D3/d3pie' 
 
 import moment from 'moment-timezone'
 import helpers from 'lib/helpers'
+
+const SHOW_DASHBOARD_MAINTENANCE_NOTICE = false
 
 @observer
 class DashboardContainer extends React.Component {
@@ -53,16 +55,51 @@ class DashboardContainer extends React.Component {
   }
 
   render () {
+    if (SHOW_DASHBOARD_MAINTENANCE_NOTICE) {
+      return (
+        <div data-testid='dashboard-maintenance-notice'>
+          <PageTitle title={'Dashboard'} />
+          <PageContent>
+            <Grid>
+              <GridItem width={'1-1'}>
+                <TruCard
+                  content={
+                    <div style={{ padding: '30px 10px' }}>
+                      <h3 style={{ marginTop: 0 }}>Dashboard Temporarily Unavailable</h3>
+                      <p className='uk-text-muted' style={{ marginBottom: 10 }}>
+                        We&apos;re currently working on improvements to the dashboard.
+                      </p>
+                      <p className='uk-text-muted' style={{ marginBottom: 0 }}>
+                        Please check back shortly. The rest of the helpdesk is still available as normal.
+                      </p>
+                    </div>
+                  }
+                />
+              </GridItem>
+            </Grid>
+          </PageContent>
+        </div>
+      )
+    }
+
+    const dashboardState = this.props.dashboardState || {}
+    const ticketBreakdownData = dashboardState.ticketBreakdownData && dashboardState.ticketBreakdownData.toJS
+      ? dashboardState.ticketBreakdownData.toJS()
+      : []
+    const topGroups = dashboardState.topGroups && dashboardState.topGroups.toJS ? dashboardState.topGroups.toJS() : []
+    const topTags = dashboardState.topTags && dashboardState.topTags.toJS ? dashboardState.topTags.toJS() : []
+    const overdueTickets = dashboardState.overdueTickets || []
+
     const formatString = helpers.getLongDateFormat() + ' ' + helpers.getTimeFormat()
     const tz = helpers.getTimezone()
-    const lastUpdatedFormatted = this.props.dashboardState.lastUpdated
-      ? moment(this.props.dashboardState.lastUpdated, 'MM/DD/YYYY hh:mm:ssa')
+    const lastUpdatedFormatted = dashboardState.lastUpdated
+      ? moment(dashboardState.lastUpdated, 'MM/DD/YYYY hh:mm:ssa')
           .tz(tz)
           .format(formatString)
       : 'Cache Still Loading...'
 
-    const closedPercent = this.props.dashboardState.closedCount
-      ? Math.round((this.props.dashboardState.closedCount / this.props.dashboardState.ticketCount) * 100).toString()
+    const closedPercent = dashboardState.closedCount
+      ? Math.round((dashboardState.closedCount / dashboardState.ticketCount) * 100).toString()
       : '0'
 
     return (
@@ -107,7 +144,7 @@ class DashboardContainer extends React.Component {
                     </span>
 
                     <h2 className='uk-margin-remove'>
-                      <CountUp startNumber={0} endNumber={this.props.dashboardState.ticketCount || 0} />
+                      <CountUp startNumber={0} endNumber={dashboardState.ticketCount || 0} />
                     </h2>
                   </div>
                 }
@@ -139,7 +176,7 @@ class DashboardContainer extends React.Component {
                     <span className='uk-text-muted uk-text-small'>Avg Response Time</span>
 
                     <h2 className='uk-margin-remove'>
-                      <CountUp endNumber={this.props.dashboardState.ticketAvg || 0} extraText={'hours'} />
+                      <CountUp endNumber={dashboardState.ticketAvg || 0} extraText={'hours'} />
                     </h2>
                   </div>
                 }
@@ -161,7 +198,7 @@ class DashboardContainer extends React.Component {
                       height={250}
                       x_accessor={'date'}
                       y_accessor={'value'}
-                      data={this.props.dashboardState.ticketBreakdownData.toJS() || []}
+                      data={ticketBreakdownData}
                     />
                   </div>
                 }
@@ -169,7 +206,7 @@ class DashboardContainer extends React.Component {
             </GridItem>
             <GridItem width={'1-2'} extraClass={'uk-margin-medium-top'}>
               <TruCard
-                loaderActive={this.props.dashboardState.loadingTopGroups}
+                loaderActive={dashboardState.loadingTopGroups}
                 animateLoader={true}
                 style={{ minHeight: 256 }}
                 header={
@@ -179,14 +216,14 @@ class DashboardContainer extends React.Component {
                 }
                 content={
                   <div>
-                    <D3Pie data={this.props.dashboardState.topGroups.toJS()} />
+                    <D3Pie data={topGroups} />
                   </div>
                 }
               />
             </GridItem>
             <GridItem width={'1-2'} extraClass={'uk-margin-medium-top'}>
               <TruCard
-                loaderActive={this.props.dashboardState.loadingTopTags}
+                loaderActive={dashboardState.loadingTopTags}
                 animateLoader={true}
                 animateDelay={800}
                 style={{ minHeight: 256 }}
@@ -197,7 +234,7 @@ class DashboardContainer extends React.Component {
                 }
                 content={
                   <div>
-                    <D3Pie type={'donut'} data={this.props.dashboardState.topTags.toJS()} />
+                    <D3Pie type={'donut'} data={topTags} />
                   </div>
                 }
               />
@@ -222,7 +259,7 @@ class DashboardContainer extends React.Component {
                         </tr>
                       </thead>
                       <tbody>
-                        {this.props.dashboardState.overdueTickets.map(ticket => {
+                        {overdueTickets.map(ticket => {
                           return (
                             <tr key={ticket.get('_id')} className={'uk-table-middle'}>
                               <td className={'uk-width-1-10 uk-text-nowrap'}>
@@ -269,10 +306,10 @@ class DashboardContainer extends React.Component {
                             Most tickets by...
                           </td>
                           <td id='mostRequester' className='uk-width-4-10 uk-text-right  uk-text-small'>
-                            {this.props.dashboardState.mostRequester
-                              ? `${this.props.dashboardState.mostRequester.get(
+                            {dashboardState.mostRequester
+                              ? `${dashboardState.mostRequester.get(
                                   'name'
-                                )} (${this.props.dashboardState.mostRequester.get('value')})`
+                                )} (${dashboardState.mostRequester.get('value')})`
                               : '--'}
                           </td>
                         </tr>
@@ -282,10 +319,10 @@ class DashboardContainer extends React.Component {
                             Most comments by....
                           </td>
                           <td id='mostCommenter' className='uk-width-4-10 uk-text-right  uk-text-small'>
-                            {this.props.dashboardState.mostCommenter
-                              ? `${this.props.dashboardState.mostCommenter.get(
+                            {dashboardState.mostCommenter
+                              ? `${dashboardState.mostCommenter.get(
                                   'name'
-                                )} (${this.props.dashboardState.mostCommenter.get('value')})`
+                                )} (${dashboardState.mostCommenter.get('value')})`
                               : '--'}
                           </td>
                         </tr>
@@ -295,10 +332,10 @@ class DashboardContainer extends React.Component {
                             Most assigned support user....
                           </td>
                           <td id='mostAssignee' className='uk-width-4-10 uk-text-right  uk-text-small'>
-                            {this.props.dashboardState.mostAssignee
-                              ? `${this.props.dashboardState.mostAssignee.get(
+                            {dashboardState.mostAssignee
+                              ? `${dashboardState.mostAssignee.get(
                                   'name'
-                                )} (${this.props.dashboardState.mostAssignee.get('value')})`
+                                )} (${dashboardState.mostAssignee.get('value')})`
                               : '--'}
                           </td>
                         </tr>
@@ -309,8 +346,8 @@ class DashboardContainer extends React.Component {
                           </td>
                           <td className='uk-width-4-10 uk-text-right  uk-text-small'>
                             <a id='mostActiveTicket' href='#'>
-                              {this.props.dashboardState.mostActiveTicket
-                                ? `T#${this.props.dashboardState.mostActiveTicket.get('uid')}`
+                              {dashboardState.mostActiveTicket
+                                ? `T#${dashboardState.mostActiveTicket.get('uid')}`
                                 : '--'}
                             </a>
                           </td>

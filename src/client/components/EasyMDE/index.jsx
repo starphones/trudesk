@@ -88,7 +88,28 @@ class EasyMDE extends React.Component {
           errorText: 'Error uploading file: ',
           uploadUrl: self.props.inlineImageUploadUrl,
           jsonFieldName: 'filename',
-          urlText: '![Image]({filename})'
+          allowedTypes: [
+            'image/jpeg',
+            'image/png',
+            'image/jpg',
+            'image/gif',
+            'image/webp',
+            'image/heif',
+            'image/heic',
+            'image/tiff',
+            'image/bmp',
+            'application/pdf'
+          ],
+          urlText: function (filename) {
+            const cleanFilename = (filename || '').split('?')[0]
+            const isPdf = /\.pdf$/i.test(cleanFilename)
+            if (isPdf) {
+              const label = cleanFilename.split('/').pop() || 'Attachment'
+              return `[${label}](${filename})`
+            }
+
+            return `![Image](${filename})`
+          }
         })
 
         EasyMDE.attachFileDesc(self.element)
@@ -123,7 +144,7 @@ class EasyMDE extends React.Component {
     const attachFileDiv = $('<div></div>')
     attachFileDiv
       .addClass('attachFileDesc')
-      .html('<p>Attach images by dragging & dropping or pasting from clipboard.</p>')
+      .html('<p>Attach images by paste/drag-drop. PDF is supported via drag-drop.</p>')
     $el.siblings('.CodeMirror').addClass('hasFileDesc')
     $el
       .siblings('.editor-statusbar')
