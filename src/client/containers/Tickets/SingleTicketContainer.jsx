@@ -64,66 +64,18 @@ import SpinLoader from 'components/SpinLoader'
 
 const AU_STATE_VALUES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
 
-const extractStateFromIssue = issue => {
-  if (!issue) return ''
-
-  let issueText = issue
-  if (typeof document !== 'undefined') {
-    const tempEl = document.createElement('div')
-    tempEl.innerHTML = issue
-
-    tempEl.querySelectorAll('br').forEach(br => {
-      br.replaceWith('\n')
-    })
-
-    tempEl.querySelectorAll('p, div, li').forEach(el => {
-      if (el.nextSibling) el.insertAdjacentText('afterend', '\n')
-    })
-
-    issueText = tempEl.textContent || tempEl.innerText || ''
-  }
-
-  const normalizedText = issueText.replace(/\s+/g, ' ').trim()
-  const inlineStateMatch = normalizedText.match(
-    /state\s*[:=]\s*(.+?)(?=\s*(store|ticket type|subject|proof of purchase|issue experienced|message)\s*[:=]|$)/i
-  )
-
-  if (inlineStateMatch && inlineStateMatch[1]) {
-    const inlineStateValue = inlineStateMatch[1].trim()
-    const matchedStateCode = AU_STATE_VALUES.find(stateValue => inlineStateValue.toUpperCase().startsWith(stateValue))
-
-    if (matchedStateCode) return matchedStateCode
-
-    return inlineStateValue
-  }
-
-  const issueLines = issueText
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean)
-
-  const stateLine = issueLines.find(line => /^state\s*:/i.test(line))
-  if (!stateLine) return ''
-
-  const stateValue = stateLine.replace(/^state\s*:/i, '').trim()
-  const matchedStateCode = AU_STATE_VALUES.find(value => stateValue.toUpperCase().startsWith(value))
-
-  if (matchedStateCode) return matchedStateCode
-
-  return stateValue
-}
-
 const fetchTicket = parent => {
   axios
     .get(`/api/v2/tickets/${parent.props.ticketUid}`)
     .then(res => {
       // setTimeout(() => {
       parent.ticket = res.data.ticket
+      parent.ticketState = (parent.ticket && parent.ticket.countryState) || ''
       parent.selectedStaffname = (parent.ticket && parent.ticket.staffname) || ''
       parent.selectedStaffFault = !!(parent.ticket && parent.ticket.staffFault)
       parent.isSubscribed =
         parent.ticket && parent.ticket.subscribers.findIndex(i => i._id === parent.props.shared.sessionUser._id) !== -1
-      parent.loadStaffs(extractStateFromIssue(parent.ticket && parent.ticket.issue))
+      parent.loadStaffs(parent.ticketState)
       // }, 3000)
     })
     .catch(error => {
@@ -229,7 +181,7 @@ class SingleTicketContainer extends React.Component {
       this.ticket = data
       this.selectedStaffname = data.staffname || ''
       this.selectedStaffFault = !!data.staffFault
-      this.ticketState = extractStateFromIssue(data.issue)
+      this.ticketState = data.countryState || ''
       this.loadStaffs(this.ticketState)
     }
   }
@@ -312,6 +264,25 @@ class SingleTicketContainer extends React.Component {
         if (res && res.data && res.data.success && res.data.ticket) {
           this.ticket = res.data.ticket
           this.selectedStaffFault = !!res.data.ticket.staffFault
+        }
+      })
+      .catch(error => {
+        Log.error(error.response || error)
+        helpers.UI.showSnackbar(error, true)
+      })
+  }
+
+  onTicketStateChanged (e) {
+    const countryState = (e.target.value || '').toUpperCase()
+    this.ticketState = countryState
+
+    axios
+      .put(`/api/v1/tickets/${this.ticket._id}`, { countryState })
+      .then(res => {
+        if (res && res.data && res.data.success && res.data.ticket) {
+          this.ticket = res.data.ticket
+          this.ticketState = res.data.ticket.countryState || ''
+          this.loadStaffs(this.ticketState)
         }
       })
       .catch(error => {
@@ -575,6 +546,20 @@ class SingleTicketContainer extends React.Component {
                             </select>
                           )}
                           {!hasTicketUpdate && <div className={'input-box'}>{this.ticket.group.name}</div>}
+                        </div>
+                        <div className='uk-width-1-1 nopadding uk-clearfix'>
+                          <span>Country State</span>
+                          {hasTicketUpdate && (
+                            <select value={this.ticketState || ''} onChange={e => this.onTicketStateChanged(e)}>
+                              <option value=''>Select State</option>
+                              {AU_STATE_VALUES.map(stateValue => (
+                                <option key={stateValue} value={stateValue}>
+                                  {stateValue}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {!hasTicketUpdate && <div className={'input-box'}>{this.ticketState || '--'}</div>}
                         </div>
                         <div className='uk-width-1-1 nopadding uk-clearfix'>
                           <span>Staff Name</span>
