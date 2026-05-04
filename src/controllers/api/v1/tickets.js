@@ -457,6 +457,11 @@ apiTickets.create = function (req, res) {
         }
 
         ticket.subject = sanitizeHtml(ticket.subject).trim()
+        if (!_.isUndefined(postData.countryState)) {
+          ticket.countryState = sanitizeHtml(postData.countryState || '')
+            .trim()
+            .toUpperCase()
+        }
 
         var marked = require('marked')
         var tIssue = ticket.issue
@@ -665,6 +670,11 @@ apiTickets.createPublicTicket = function (req, res) {
           history: [HistoryItem],
           subscribers: [savedUser._id]
         })
+        if (!_.isUndefined(postData.ticket.countryState)) {
+          ticket.countryState = sanitizeHtml(postData.ticket.countryState || '')
+            .trim()
+            .toUpperCase()
+        }
 
         const marked = require('marked')
         let tIssue = ticket.issue
@@ -849,6 +859,25 @@ apiTickets.update = function (req, res) {
               var HistoryItem = {
                 action: 'ticket:set:staffname',
                 description: ticket.staffname ? ticket.staffname + ' was set as staff name' : 'Staff name was cleared',
+                owner: req.user._id
+              }
+
+              ticket.history.push(HistoryItem)
+            }
+
+            return cb()
+          },
+          function (cb) {
+            if (!_.isUndefined(reqTicket.countryState)) {
+              ticket.countryState = sanitizeHtml(reqTicket.countryState || '')
+                .trim()
+                .toUpperCase()
+
+              var HistoryItem = {
+                action: 'ticket:set:countrystate',
+                description: ticket.countryState
+                  ? 'Ticket state set to ' + ticket.countryState
+                  : 'Ticket state was cleared',
                 owner: req.user._id
               }
 
