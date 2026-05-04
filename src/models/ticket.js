@@ -107,6 +107,7 @@ const ticketSchema = mongoose.Schema({
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'tags', autopopulate: true }],
   staffname: { type: String, default: '' },
   staffFault: { type: Boolean, default: false },
+  countryState: { type: String, default: '' },
   subject: { type: String, required: true },
   issue: { type: String, required: true },
   closedDate: { type: Date },
@@ -940,6 +941,9 @@ function buildQueryWithObject (SELF, grpId, object, count) {
 
     // Assignee Filter
     if (object.filter.assignee) query.where({ assignee: { $in: object.filter.assignee } })
+
+    // State Filter
+    if (object.filter.ticketStates) query.where({ countryState: { $in: object.filter.ticketStates } })
 
     // Unassigned Filter
     if (object.filter.unassigned) query.where({ assignee: { $exists: false } })

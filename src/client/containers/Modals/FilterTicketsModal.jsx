@@ -26,6 +26,8 @@ import Button from 'components/Button'
 
 import helpers from 'lib/helpers'
 
+const AU_STATE_VALUES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
+
 class FilterTicketsModal extends React.Component {
   constructor (props) {
     super(props)
@@ -59,6 +61,7 @@ class FilterTicketsModal extends React.Component {
     const types = this.typesSelect.value
     const groups = this.groupSelect.value
     const assignees = this.assigneeSelect.value
+    const ticketStates = this.ticketStateSelect.value
 
     let queryString = '?f=1'
     if (startDate) queryString += `&ds=${startDate}`
@@ -84,6 +87,10 @@ class FilterTicketsModal extends React.Component {
 
     each(assignees, i => {
       queryString += `&au=${i}`
+    })
+
+    each(ticketStates, i => {
+      queryString += `&ts=${i}`
     })
 
     History.pushState(null, null, `/tickets/filter/${queryString}&r=${Math.floor(Math.random() * (99999 - 1 + 1)) + 1}`)
@@ -116,6 +123,8 @@ class FilterTicketsModal extends React.Component {
         return { text: a.get('fullname'), value: a.get('_id') }
       })
       .toArray()
+
+    const ticketStates = AU_STATE_VALUES.map(state => ({ text: state, value: state }))
 
     return (
       <BaseModal options={{ bgclose: false }}>
@@ -185,6 +194,19 @@ class FilterTicketsModal extends React.Component {
                 showTextbox={false}
                 multiple={true}
                 ref={r => (this.assigneeSelect = r)}
+              />
+            </div>
+          </div>
+          <div className='uk-grid uk-grid-collapse uk-margin-small-bottom'>
+            <div className='uk-width-1-1'>
+              <label htmlFor='filterStatus' className='uk-form-label' style={{ paddingBottom: 0, marginBottom: 0 }}>
+                State
+              </label>
+              <SingleSelect
+                items={ticketStates}
+                showTextbox={false}
+                multiple={true}
+                ref={r => (this.ticketStateSelect = r)}
               />
             </div>
           </div>
