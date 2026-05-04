@@ -120,6 +120,7 @@ const fetchTicket = parent => {
       // setTimeout(() => {
       parent.ticket = res.data.ticket
       parent.selectedStaffname = (parent.ticket && parent.ticket.staffname) || ''
+      parent.selectedStaffFault = !!(parent.ticket && parent.ticket.staffFault)
       parent.isSubscribed =
         parent.ticket && parent.ticket.subscribers.findIndex(i => i._id === parent.props.shared.sessionUser._id) !== -1
       parent.loadStaffs(extractStateFromIssue(parent.ticket && parent.ticket.issue))
@@ -148,6 +149,7 @@ class SingleTicketContainer extends React.Component {
   @observable isSubscribed = false
   @observable staffs = []
   @observable selectedStaffname = ''
+  @observable selectedStaffFault = false
   @observable ticketState = ''
   assigneeDropdownPartial = createRef()
 
@@ -226,6 +228,7 @@ class SingleTicketContainer extends React.Component {
     if (this.ticket._id === data._id) {
       this.ticket = data
       this.selectedStaffname = data.staffname || ''
+      this.selectedStaffFault = !!data.staffFault
       this.ticketState = extractStateFromIssue(data.issue)
       this.loadStaffs(this.ticketState)
     }
@@ -291,6 +294,24 @@ class SingleTicketContainer extends React.Component {
         if (res && res.data && res.data.success && res.data.ticket) {
           this.ticket = res.data.ticket
           this.selectedStaffname = res.data.ticket.staffname || ''
+        }
+      })
+      .catch(error => {
+        Log.error(error.response || error)
+        helpers.UI.showSnackbar(error, true)
+      })
+  }
+
+  onStaffFaultChanged (e) {
+    const staffFault = e.target.value === 'true'
+    this.selectedStaffFault = staffFault
+
+    axios
+      .put(`/api/v1/tickets/${this.ticket._id}`, { staffFault })
+      .then(res => {
+        if (res && res.data && res.data.success && res.data.ticket) {
+          this.ticket = res.data.ticket
+          this.selectedStaffFault = !!res.data.ticket.staffFault
         }
       })
       .catch(error => {
@@ -568,6 +589,16 @@ class SingleTicketContainer extends React.Component {
                             </select>
                           )}
                           {!hasTicketUpdate && <div className={'input-box'}>{this.selectedStaffname || '--'}</div>}
+                        </div>
+                        <div className='uk-width-1-1 nopadding uk-clearfix'>
+                          <span>Staff's Fault?</span>
+                          {hasTicketUpdate && (
+                            <select value={this.selectedStaffFault ? 'true' : 'false'} onChange={e => this.onStaffFaultChanged(e)}>
+                              <option value='true'>Yes</option>
+                              <option value='false'>No</option>
+                            </select>
+                          )}
+                          {!hasTicketUpdate && <div className={'input-box'}>{this.selectedStaffFault ? 'Yes' : 'No'}</div>}
                         </div>
                         {/*  Due Date */}
                         <div className='uk-width-1-1 p-0'>
