@@ -858,6 +858,23 @@ apiTickets.update = function (req, res) {
             return cb()
           },
           function (cb) {
+            if (!_.isUndefined(reqTicket.staffFault)) {
+              const rawStaffFault = reqTicket.staffFault
+              ticket.staffFault =
+                rawStaffFault === true || rawStaffFault === 'true' || rawStaffFault === 1 || rawStaffFault === '1'
+
+              var HistoryItem = {
+                action: 'ticket:set:stafffault',
+                description: 'Staff fault was set to ' + (ticket.staffFault ? 'Yes' : 'No'),
+                owner: req.user._id
+              }
+
+              ticket.history.push(HistoryItem)
+            }
+
+            return cb()
+          },
+          function (cb) {
             if (!_.isUndefined(reqTicket.assignee) && !_.isNull(reqTicket.assignee)) {
               ticket.assignee = reqTicket.assignee
               ticket.populate('assignee', function (err, t) {
