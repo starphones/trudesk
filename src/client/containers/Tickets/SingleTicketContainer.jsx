@@ -71,6 +71,7 @@ const fetchTicket = parent => {
       // setTimeout(() => {
       parent.ticket = res.data.ticket
       parent.ticketState = (parent.ticket && parent.ticket.countryState) || ''
+      parent.storeName = (parent.ticket && parent.ticket.storeName) || ''
       parent.selectedStaffname = (parent.ticket && parent.ticket.staffname) || ''
       parent.selectedStaffFault = !!(parent.ticket && parent.ticket.staffFault)
       parent.isSubscribed =
@@ -103,6 +104,7 @@ class SingleTicketContainer extends React.Component {
   @observable selectedStaffname = ''
   @observable selectedStaffFault = false
   @observable ticketState = ''
+  @observable storeName = ''
   assigneeDropdownPartial = createRef()
 
   constructor (props) {
@@ -182,6 +184,7 @@ class SingleTicketContainer extends React.Component {
       this.selectedStaffname = data.staffname || ''
       this.selectedStaffFault = !!data.staffFault
       this.ticketState = data.countryState || ''
+      this.storeName = data.storeName || ''
       this.loadStaffs(this.ticketState)
     }
   }
@@ -283,6 +286,30 @@ class SingleTicketContainer extends React.Component {
           this.ticket = res.data.ticket
           this.ticketState = res.data.ticket.countryState || ''
           this.loadStaffs(this.ticketState)
+        }
+      })
+      .catch(error => {
+        Log.error(error.response || error)
+        helpers.UI.showSnackbar(error, true)
+      })
+  }
+
+  onStoreNameChanged (e) {
+    this.storeName = e.target.value
+  }
+
+  onStoreNameBlur () {
+    const storeName = this.storeName || ''
+    const currentStoreName = (this.ticket && this.ticket.storeName) || ''
+
+    if (storeName === currentStoreName) return
+
+    axios
+      .put(`/api/v1/tickets/${this.ticket._id}`, { storeName })
+      .then(res => {
+        if (res && res.data && res.data.success && res.data.ticket) {
+          this.ticket = res.data.ticket
+          this.storeName = res.data.ticket.storeName || ''
         }
       })
       .catch(error => {
@@ -560,6 +587,20 @@ class SingleTicketContainer extends React.Component {
                             </select>
                           )}
                           {!hasTicketUpdate && <div className={'input-box'}>{this.ticketState || '--'}</div>}
+                        </div>
+                        <div className='uk-width-1-1 nopadding uk-clearfix'>
+                          <span>Store Name</span>
+                          {hasTicketUpdate && (
+                            <input
+                              type='text'
+                              className='store-name-input'
+                              value={this.storeName || ''}
+                              placeholder='Enter store name'
+                              onChange={e => this.onStoreNameChanged(e)}
+                              onBlur={() => this.onStoreNameBlur()}
+                            />
+                          )}
+                          {!hasTicketUpdate && <div className={'input-box'}>{this.storeName || '--'}</div>}
                         </div>
                         <div className='uk-width-1-1 nopadding uk-clearfix'>
                           <span>Staff Name</span>

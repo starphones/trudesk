@@ -108,6 +108,7 @@ const ticketSchema = mongoose.Schema({
   staffname: { type: String, default: '' },
   staffFault: { type: Boolean, default: false },
   countryState: { type: String, default: '' },
+  storeName: { type: String, default: '' },
   subject: { type: String, required: true },
   issue: { type: String, required: true },
   closedDate: { type: Date },
@@ -947,6 +948,12 @@ function buildQueryWithObject (SELF, grpId, object, count) {
 
     // Staff Name Filter
     if (object.filter.staffnames) query.where({ staffname: { $in: object.filter.staffnames } })
+
+    // Store Name Filter
+    if (object.filter.storeNames) query.where({ storeName: { $in: object.filter.storeNames } })
+
+    // Staff Fault Filter
+    if (object.filter.staffFaults) query.where({ staffFault: { $in: object.filter.staffFaults } })
 
     // Unassigned Filter
     if (object.filter.unassigned) query.where({ assignee: { $exists: false } })
