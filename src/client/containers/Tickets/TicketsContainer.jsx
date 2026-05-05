@@ -375,15 +375,16 @@ class TicketsContainer extends React.Component {
               <TableHeader key={3} width={'23%'} text={'Subject'} />,
               <TableHeader key={4} width={110} text={'Created'} />,
               <TableHeader key={5} width={125} text={'Requester'} />,
-              <TableHeader key={6} width={175} text={'Customer'} />,
-              <TableHeader key={7} text={'Assignee'} />,
-              <TableHeader key={8} width={110} text={'Due Date'} />,
-              <TableHeader key={9} text={'Updated'} />
+              <TableHeader key={6} text={'Staff'} />,
+              <TableHeader key={7} text={'City'} />,
+              <TableHeader key={8} text={'Store'} />,
+              <TableHeader key={9} text={'Assignee'} />,
+              <TableHeader key={10} text={'Updated'} />
             ]}
           >
             {!this.props.loading && this.props.tickets.size < 1 && (
               <TableRow clickable={false}>
-                <TableCell colSpan={10}>
+                <TableCell colSpan={11}>
                   <h5 style={{ margin: 10 }}>No Tickets Found</h5>
                 </TableCell>
               </TableRow>
@@ -398,15 +399,14 @@ class TicketsContainer extends React.Component {
                   const a = ticket.get('assignee')
                   return !a ? '--' : a.get('fullname')
                 }
+                const staffName = ticket.get('staffname') ? ticket.get('staffname') : 'No staff assigned'
+                const city = ticket.get('countryState') ? ticket.get('countryState') : '--'
+                const storeName = ticket.get('storeName') ? ticket.get('storeName') : '--'
 
                 const updated = ticket.get('updated')
                   ? helpers.formatDate(ticket.get('updated'), helpers.getShortDateFormat()) +
                     ', ' +
                     helpers.formatDate(ticket.get('updated'), helpers.getTimeFormat())
-                  : '--'
-
-                const dueDate = ticket.get('dueDate')
-                  ? helpers.formatDate(ticket.get('dueDate'), helpers.getShortDateFormat())
                   : '--'
 
                 const isOverdue = () => {
@@ -472,9 +472,10 @@ class TicketsContainer extends React.Component {
                       {helpers.formatDate(ticket.get('date'), helpers.getShortDateFormat())}
                     </TableCell>
                     <TableCell className={'vam nbb'}>{ticket.getIn(['owner', 'fullname'])}</TableCell>
-                    <TableCell className={'vam nbb'}>{ticket.getIn(['group', 'name'])}</TableCell>
+                    <TableCell className={'vam nbb'}>{staffName}</TableCell>
+                    <TableCell className={'vam nbb'}>{city}</TableCell>
+                    <TableCell className={'vam nbb'}>{storeName}</TableCell>
                     <TableCell className={'vam nbb'}>{assignee()}</TableCell>
-                    <TableCell className={'vam nbb'}>{dueDate}</TableCell>
                     <TableCell className={'vam nbb'} style={{ fontWeight: unreadUpdate ? 700 : 400 }}>
                       {updated}
                     </TableCell>

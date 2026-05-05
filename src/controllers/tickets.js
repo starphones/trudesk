@@ -233,6 +233,8 @@ ticketsController.filter = function (req, res, next) {
   let assignee = queryString.au
   let ticketStates = queryString.ts
   let staffnames = queryString.sn
+  let storeNames = queryString.ss
+  let staffFaults = queryString.sf
 
   const rawNoPage = req.originalUrl.replace(/[?&]page=[^&#]*(#.*)?$/, '$1').replace(/([?&])page=[^&]*&/, '$1')
 
@@ -252,6 +254,18 @@ ticketsController.filter = function (req, res, next) {
   if (!_.isUndefined(ticketStates) && !_.isArray(ticketStates)) ticketStates = [ticketStates]
   if (!_.isUndefined(staffnames)) staffnames = xss(staffnames)
   if (!_.isUndefined(staffnames) && !_.isArray(staffnames)) staffnames = [staffnames]
+  if (!_.isUndefined(storeNames)) storeNames = xss(storeNames)
+  if (!_.isUndefined(storeNames) && !_.isArray(storeNames)) storeNames = [storeNames]
+  if (!_.isUndefined(staffFaults)) staffFaults = xss(staffFaults)
+  if (!_.isUndefined(staffFaults) && !_.isArray(staffFaults)) staffFaults = [staffFaults]
+  if (!_.isUndefined(staffFaults)) {
+    staffFaults = _.chain(staffFaults)
+      .map(v => String(v).toLowerCase())
+      .filter(v => v === 'true' || v === 'false')
+      .map(v => v === 'true')
+      .uniq()
+      .value()
+  }
 
   const filter = {
     uid: uid,
@@ -269,6 +283,8 @@ ticketsController.filter = function (req, res, next) {
     assignee: assignee,
     ticketStates: ticketStates,
     staffnames: staffnames,
+    storeNames: storeNames,
+    staffFaults: staffFaults,
     raw: rawNoPage
   }
 
