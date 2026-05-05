@@ -370,6 +370,81 @@ apiTickets.search = function (req, res) {
   )
 }
 
+apiTickets.getStoreNames = function (req, res) {
+  var ticketModel = require('../../../models/ticket')
+  var groupModel = require('../../../models/group')
+  var departmentModel = require('../../../models/department')
+
+  async.waterfall(
+    [
+      function (callback) {
+        if (req.user.role.isAdmin || req.user.role.isAgent) {
+          return departmentModel.getDepartmentGroupsOfUser(req.user._id, callback)
+        } else {
+          return groupModel.getAllGroupsOfUserNoPopulate(req.user._id, callback)
+        }
+      },
+      function (grps, callback) {
+        if (permissions.canThis(req.user.role, 'tickets:public')) {
+          groupModel.getAllPublicGroups(function (err, publicGroups) {
+            if (err) return callback(err)
+
+            grps = grps.concat(publicGroups)
+            return callback(null, grps)
+          })
+        } else {
+          return callback(null, grps)
+        }
+      },
+      function (grps, callback) {
+        var groupIds = _.chain(grps)
+          .map(function (g) {
+            return g && g._id ? g._id : g
+          })
+          .compact()
+          .uniqBy(function (id) {
+            return id.toString()
+          })
+          .value()
+
+        ticketModel
+          .find({
+            group: { $in: groupIds },
+            deleted: false,
+            storeName: { $exists: true, $ne: '' }
+          })
+          .distinct('storeName')
+          .exec(function (err, storeNames) {
+            if (err) return callback(err)
+
+            var names = _.chain(storeNames)
+              .map(function (name) {
+                return _.isString(name) ? name.trim() : ''
+              })
+              .filter(function (name) {
+                return !!name
+              })
+              .uniq()
+              .sortBy(function (name) {
+                return name.toLowerCase()
+              })
+              .value()
+
+            return callback(null, names)
+          })
+      }
+    ],
+    function (err, storeNames) {
+      if (err) return res.status(400).json({ success: false, error: err.message || err })
+
+      return res.json({
+        success: true,
+        storeNames: storeNames || []
+      })
+    }
+  )
+}
+
 /**
  * @api {post} /api/v1/tickets/create Create Ticket
  * @apiName createTicket
@@ -461,6 +536,9 @@ apiTickets.create = function (req, res) {
           ticket.countryState = sanitizeHtml(postData.countryState || '')
             .trim()
             .toUpperCase()
+        }
+        if (!_.isUndefined(postData.storeName)) {
+          ticket.storeName = sanitizeHtml(postData.storeName || '').trim()
         }
 
         var marked = require('marked')
@@ -675,6 +753,9 @@ apiTickets.createPublicTicket = function (req, res) {
             .trim()
             .toUpperCase()
         }
+        if (!_.isUndefined(postData.ticket.storeName)) {
+          ticket.storeName = sanitizeHtml(postData.ticket.storeName || '').trim()
+        }
 
         const marked = require('marked')
         let tIssue = ticket.issue
@@ -878,6 +959,21 @@ apiTickets.update = function (req, res) {
                 description: ticket.countryState
                   ? 'Ticket state set to ' + ticket.countryState
                   : 'Ticket state was cleared',
+                owner: req.user._id
+              }
+
+              ticket.history.push(HistoryItem)
+            }
+
+            return cb()
+          },
+          function (cb) {
+            if (!_.isUndefined(reqTicket.storeName)) {
+              ticket.storeName = sanitizeHtml(reqTicket.storeName || '').trim()
+
+              var HistoryItem = {
+                action: 'ticket:set:storename',
+                description: ticket.storeName ? 'Store name set to ' + ticket.storeName : 'Store name was cleared',
                 owner: req.user._id
               }
 

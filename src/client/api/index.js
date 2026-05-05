@@ -217,6 +217,12 @@ api.tickets.fetchStaffs = ({ state } = {}) => {
   })
 }
 
+api.tickets.fetchStoreNames = () => {
+  return axios.get('/api/v1/tickets/storenames').then(res => {
+    return res.data
+  })
+}
+
 api.accounts = {}
 api.accounts.create = payload => {
   return axios.post('/api/v2/accounts', payload).then(res => {
