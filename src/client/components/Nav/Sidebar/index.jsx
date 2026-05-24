@@ -35,8 +35,8 @@ class Sidebar extends React.Component {
     //     this.setState({ plugins: result.plugins })
     //   }
     // })
-    const sidebarRoute = document.getElementById('__sidebar_route').innerText
-    const sidebarSubRoute = document.getElementById('__sidebar_sub_route').innerText
+    const sidebarRoute = document.getElementById('__sidebar_route').innerText.trim()
+    const sidebarSubRoute = document.getElementById('__sidebar_sub_route').innerText.trim()
 
     this.props.updateNavChange({ activeItem: sidebarRoute, activeSubItem: sidebarSubRoute })
   }
@@ -127,6 +127,12 @@ class Sidebar extends React.Component {
                     icon='person_add_disabled'
                     href='/tickets/unassigned'
                     active={activeSubItem === 'tickets-unassigned'}
+                  />
+                  <SubmenuItem
+                    text='Escalated'
+                    icon='priority_high'
+                    href='/tickets/escalated'
+                    active={activeSubItem === 'tickets-escalated'}
                   />
                 </Submenu>
               </SidebarItem>

@@ -5,6 +5,7 @@ import { observer } from 'mobx-react'
 import { observable } from 'mobx'
 
 import {
+  fetchDashboardCompletedCount,
   fetchDashboardData,
   fetchDashboardTopGroups,
   fetchDashboardTopTags,
@@ -41,6 +42,7 @@ class DashboardContainer extends React.Component {
     helpers.UI.setupPeity()
 
     this.props.fetchDashboardData({ timespan: this.timespan })
+    this.props.fetchDashboardCompletedCount({ timespan: this.timespan })
     this.props.fetchDashboardTopGroups({ timespan: this.timespan })
     this.props.fetchDashboardTopTags({ timespan: this.timespan })
     this.props.fetchDashboardOverdueTickets()
@@ -50,6 +52,7 @@ class DashboardContainer extends React.Component {
     e.preventDefault()
     this.timespan = e.target.value
     this.props.fetchDashboardData({ timespan: e.target.value })
+    this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
     this.props.fetchDashboardTopGroups({ timespan: e.target.value })
     this.props.fetchDashboardTopTags({ timespan: e.target.value })
   }
@@ -98,8 +101,9 @@ class DashboardContainer extends React.Component {
           .format(formatString)
       : 'Cache Still Loading...'
 
-    const closedPercent = dashboardState.closedCount
-      ? Math.round((dashboardState.closedCount / dashboardState.ticketCount) * 100).toString()
+    const completedCount = dashboardState.completedCount || 0
+    const closedPercent = dashboardState.ticketCount
+      ? Math.round((completedCount / dashboardState.ticketCount) * 100).toString()
       : '0'
 
     return (
@@ -211,7 +215,7 @@ class DashboardContainer extends React.Component {
                 style={{ minHeight: 256 }}
                 header={
                   <div className='uk-text-left'>
-                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Top 5 Groups</h6>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Most Tickets per State</h6>
                   </div>
                 }
                 content={
@@ -378,6 +382,7 @@ const mapStateToProps = state => ({
 })
 
 export default connect(mapStateToProps, {
+  fetchDashboardCompletedCount,
   fetchDashboardData,
   fetchDashboardTopGroups,
   fetchDashboardTopTags,
