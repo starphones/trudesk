@@ -29,8 +29,8 @@ define('modules/ajaxify', ['jquery', 'lodash', 'modules/helpers', 'history'], fu
     window.react.redux.store.dispatch({
       type: 'NAV_CHANGE',
       payload: {
-        activeItem: $('#__sidebar_route').text(),
-        activeSubItem: $('#__sidebar_sub_route').text(),
+        activeItem: $('#__sidebar_route').text().trim(),
+        activeSubItem: $('#__sidebar_sub_route').text().trim(),
         sessionUser: window.trudeskSessionService.getUser()
       }
     })

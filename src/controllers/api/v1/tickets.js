@@ -1898,6 +1898,50 @@ apiTickets.getTicketStats = function (req, res) {
   // return res.send(obj);
 }
 
+/**
+ * @api {get} /api/v1/tickets/stats/completed Get Completed Ticket Count
+ * @apiName getCompletedTicketCount
+ * @apiDescription Gets total completed tickets based on statuses with isResolved=true
+ * @apiVersion 0.1.9
+ * @apiGroup Ticket
+ * @apiHeader {string} accesstoken The access token for the logged in user
+ *
+ * @apiExample Example usage:
+ * curl -H "accesstoken: {accesstoken}" -l http://localhost/api/v1/tickets/stats/completed
+ * curl -H "accesstoken: {accesstoken}" -l http://localhost/api/v1/tickets/stats/completed/30
+ */
+apiTickets.getCompletedTicketCount = function (req, res) {
+  var timespan = req.params.timespan ? parseInt(req.params.timespan) : 0
+  if (_.isNaN(timespan)) timespan = 0
+
+  var query = { deleted: false }
+  if (timespan > 0) {
+    var today = moment()
+      .hour(23)
+      .minute(59)
+      .second(59)
+    var start = today.clone().subtract(timespan, 'd')
+    query.date = { $gte: start.toDate(), $lte: today.toDate() }
+  }
+
+  var statusSchema = require('../../../models/ticketStatus')
+  var ticketSchema = require('../../../models/ticket')
+
+  statusSchema.find({ isResolved: true }, '_id', function (err, statuses) {
+    if (err) return res.status(400).json({ success: false, error: 'Invalid Request' })
+
+    var statusIds = _.map(statuses, '_id')
+    if (_.isEmpty(statusIds)) return res.json({ success: true, count: 0 })
+
+    query.status = { $in: statusIds }
+    ticketSchema.countDocuments(query, function (countErr, count) {
+      if (countErr) return res.status(400).json({ success: false, error: 'Invalid Request' })
+
+      return res.json({ success: true, count: count })
+    })
+  })
+}
+
 function parseTicketStats (role, tickets, callback) {
   if (_.isEmpty(tickets)) return callback({ tickets: tickets, tags: {} })
   var t = []

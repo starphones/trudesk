@@ -16,6 +16,7 @@ import { call, put, takeLatest } from 'redux-saga/effects'
 
 import api from '../../api'
 import {
+  FETCH_DASHBOARD_COMPLETED_COUNT,
   FETCH_DASHBOARD_DATA,
   FETCH_DASHBOARD_OVERDUE_TICKETS,
   FETCH_DASHBOARD_TOP_GROUPS,
@@ -73,6 +74,22 @@ function * fetchDashboardTopTags ({ payload }) {
   }
 }
 
+function * fetchDashboardCompletedCount ({ payload }) {
+  yield put({ type: FETCH_DASHBOARD_COMPLETED_COUNT.PENDING })
+  try {
+    const response = yield call(api.dashboard.getCompletedCount, payload)
+    yield put({ type: FETCH_DASHBOARD_COMPLETED_COUNT.SUCCESS, response })
+  } catch (error) {
+    const errorText = error.response ? error.response.data.error : error
+    if (error.response && error.response.status !== (401 || 403)) {
+      Log.error(errorText, error)
+      helpers.UI.showSnackbar(`Error: ${errorText}`, true)
+    }
+
+    yield put({ type: FETCH_DASHBOARD_COMPLETED_COUNT.ERROR, error })
+  }
+}
+
 function * fetchDashboardOverdueTickets ({ payload }) {
   yield put({ type: FETCH_DASHBOARD_OVERDUE_TICKETS.PENDING })
   try {
@@ -93,5 +110,6 @@ export default function * watcher () {
   yield takeLatest(FETCH_DASHBOARD_DATA.ACTION, fetchDashboardData)
   yield takeLatest(FETCH_DASHBOARD_TOP_GROUPS.ACTION, fetchDashboardTopGroups)
   yield takeLatest(FETCH_DASHBOARD_TOP_TAGS.ACTION, fetchDashboardTopTags)
+  yield takeLatest(FETCH_DASHBOARD_COMPLETED_COUNT.ACTION, fetchDashboardCompletedCount)
   yield takeLatest(FETCH_DASHBOARD_OVERDUE_TICKETS.ACTION, fetchDashboardOverdueTickets)
 }

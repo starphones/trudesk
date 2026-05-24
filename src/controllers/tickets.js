@@ -215,6 +215,34 @@ ticketsController.getUnassigned = function (req, res, next) {
   return next()
 }
 
+/**
+ * Get Ticket View based on escalated ticket status
+ * _calls ```next()``` to send to processor_
+ * @param {object} req Express Request
+ * @param {object} res Express Response
+ * @param {callback} next Sends the ```req.processor``` object to the processor
+ * @see Ticket
+ */
+ticketsController.getEscalated = function (req, res, next) {
+  let page = req.params.page
+  if (_.isUndefined(page)) page = 0
+
+  const processor = {}
+  processor.title = 'Tickets'
+  processor.nav = 'tickets'
+  processor.subnav = 'tickets-escalated'
+  processor.renderpage = 'tickets'
+  processor.pagetype = 'escalated'
+  processor.object = {
+    limit: 50,
+    page: page
+  }
+
+  req.processor = processor
+
+  return next()
+}
+
 ticketsController.filter = function (req, res, next) {
   let page = req.query.page
   if (_.isUndefined(page)) page = 0
