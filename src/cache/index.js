@@ -91,26 +91,95 @@ truCache.refreshCache = function (callback) {
                 cache.set('tickets:overview:e30:ticketCount', stats.e30.tickets, expire)
                 cache.set('tickets:overview:e30:closedTickets', stats.e30.closedTickets, expire)
                 cache.set('tickets:overview:e30:responseTime', stats.e30.avgResponse, expire)
+                cache.set('tickets:overview:e30:responseTimeInProgressToPending', stats.e30.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e30:responseTimePendingToInProgress', stats.e30.avgPendingToInProgress, expire)
+                cache.set('tickets:overview:e30:responseTimeTodoToResolved', stats.e30.avgTodoToResolved, expire)
+                cache.set('tickets:overview:e30:totalResolved', stats.e30.totalResolved, expire)
+                cache.set('tickets:overview:e30:totalClosed', stats.e30.totalClosed, expire)
+                cache.set('tickets:overview:e30:totalRefunded', stats.e30.totalRefunded, expire)
+                cache.set('tickets:overview:e30:totalResolvedOnly', stats.e30.totalResolvedOnly, expire)
+                cache.set('tickets:overview:e30:fastestTodoToResolved', stats.e30.fastestTodoToResolved, expire)
+                cache.set('tickets:overview:e30:longestTodoToResolved', stats.e30.longestTodoToResolved, expire)
                 cache.set('tickets:overview:e30:graphData', stats.e30.graphData, expire)
 
                 cache.set('tickets:overview:e60:ticketCount', stats.e60.tickets, expire)
                 cache.set('tickets:overview:e60:closedTickets', stats.e60.closedTickets, expire)
                 cache.set('tickets:overview:e60:responseTime', stats.e60.avgResponse, expire)
+                cache.set('tickets:overview:e60:responseTimeInProgressToPending', stats.e60.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e60:responseTimePendingToInProgress', stats.e60.avgPendingToInProgress, expire)
+                cache.set('tickets:overview:e60:responseTimeTodoToResolved', stats.e60.avgTodoToResolved, expire)
+                cache.set('tickets:overview:e60:totalResolved', stats.e60.totalResolved, expire)
+                cache.set('tickets:overview:e60:totalClosed', stats.e60.totalClosed, expire)
+                cache.set('tickets:overview:e60:totalRefunded', stats.e60.totalRefunded, expire)
+                cache.set('tickets:overview:e60:totalResolvedOnly', stats.e60.totalResolvedOnly, expire)
+                cache.set('tickets:overview:e60:fastestTodoToResolved', stats.e60.fastestTodoToResolved, expire)
+                cache.set('tickets:overview:e60:longestTodoToResolved', stats.e60.longestTodoToResolved, expire)
                 cache.set('tickets:overview:e60:graphData', stats.e60.graphData, expire)
 
                 cache.set('tickets:overview:e90:ticketCount', stats.e90.tickets, expire)
                 cache.set('tickets:overview:e90:closedTickets', stats.e90.closedTickets, expire)
                 cache.set('tickets:overview:e90:responseTime', stats.e90.avgResponse, expire)
+                cache.set('tickets:overview:e90:responseTimeInProgressToPending', stats.e90.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e90:responseTimePendingToInProgress', stats.e90.avgPendingToInProgress, expire)
+                cache.set('tickets:overview:e90:responseTimeTodoToResolved', stats.e90.avgTodoToResolved, expire)
+                cache.set('tickets:overview:e90:totalResolved', stats.e90.totalResolved, expire)
+                cache.set('tickets:overview:e90:totalClosed', stats.e90.totalClosed, expire)
+                cache.set('tickets:overview:e90:totalRefunded', stats.e90.totalRefunded, expire)
+                cache.set('tickets:overview:e90:totalResolvedOnly', stats.e90.totalResolvedOnly, expire)
+                cache.set('tickets:overview:e90:fastestTodoToResolved', stats.e90.fastestTodoToResolved, expire)
+                cache.set('tickets:overview:e90:longestTodoToResolved', stats.e90.longestTodoToResolved, expire)
                 cache.set('tickets:overview:e90:graphData', stats.e90.graphData, expire)
 
                 cache.set('tickets:overview:e180:ticketCount', stats.e180.tickets, expire)
                 cache.set('tickets:overview:e180:closedTickets', stats.e180.closedTickets, expire)
                 cache.set('tickets:overview:e180:responseTime', stats.e180.avgResponse, expire)
+                cache.set(
+                  'tickets:overview:e180:responseTimeInProgressToPending',
+                  stats.e180.avgInProgressToPending,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e180:responseTimePendingToInProgress',
+                  stats.e180.avgPendingToInProgress,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e180:responseTimeTodoToResolved',
+                  stats.e180.avgTodoToResolved,
+                  expire
+                )
+                cache.set('tickets:overview:e180:totalResolved', stats.e180.totalResolved, expire)
+                cache.set('tickets:overview:e180:totalClosed', stats.e180.totalClosed, expire)
+                cache.set('tickets:overview:e180:totalRefunded', stats.e180.totalRefunded, expire)
+                cache.set('tickets:overview:e180:totalResolvedOnly', stats.e180.totalResolvedOnly, expire)
+                cache.set('tickets:overview:e180:fastestTodoToResolved', stats.e180.fastestTodoToResolved, expire)
+                cache.set('tickets:overview:e180:longestTodoToResolved', stats.e180.longestTodoToResolved, expire)
                 cache.set('tickets:overview:e180:graphData', stats.e180.graphData, expire)
 
                 cache.set('tickets:overview:e365:ticketCount', stats.e365.tickets, expire)
                 cache.set('tickets:overview:e365:closedTickets', stats.e365.closedTickets, expire)
                 cache.set('tickets:overview:e365:responseTime', stats.e365.avgResponse, expire)
+                cache.set(
+                  'tickets:overview:e365:responseTimeInProgressToPending',
+                  stats.e365.avgInProgressToPending,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e365:responseTimePendingToInProgress',
+                  stats.e365.avgPendingToInProgress,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e365:responseTimeTodoToResolved',
+                  stats.e365.avgTodoToResolved,
+                  expire
+                )
+                cache.set('tickets:overview:e365:totalResolved', stats.e365.totalResolved, expire)
+                cache.set('tickets:overview:e365:totalClosed', stats.e365.totalClosed, expire)
+                cache.set('tickets:overview:e365:totalRefunded', stats.e365.totalRefunded, expire)
+                cache.set('tickets:overview:e365:totalResolvedOnly', stats.e365.totalResolvedOnly, expire)
+                cache.set('tickets:overview:e365:fastestTodoToResolved', stats.e365.fastestTodoToResolved, expire)
+                cache.set('tickets:overview:e365:longestTodoToResolved', stats.e365.longestTodoToResolved, expire)
                 cache.set('tickets:overview:e365:graphData', stats.e365.graphData, expire)
 
                 return done()

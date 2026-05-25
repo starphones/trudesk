@@ -105,6 +105,11 @@ class DashboardContainer extends React.Component {
     const closedPercent = dashboardState.ticketCount
       ? Math.round((completedCount / dashboardState.ticketCount) * 100).toString()
       : '0'
+    const stripMinutes = value => {
+      if (!value || typeof value !== 'string') return '0'
+      const withoutMins = value.replace(/\s*\d+\s*mins?/i, '').trim()
+      return withoutMins.length > 0 ? withoutMins : '0'
+    }
 
     return (
       <div>
@@ -136,7 +141,7 @@ class DashboardContainer extends React.Component {
         />
         <PageContent>
           <Grid>
-            <GridItem width={'1-3'}>
+            <GridItem width={'1-2'}>
               <TruCard
                 content={
                   <div>
@@ -154,7 +159,7 @@ class DashboardContainer extends React.Component {
                 }
               />
             </GridItem>
-            <GridItem width={'1-3'}>
+            <GridItem width={'1-2'}>
               <TruCard
                 content={
                   <div>
@@ -170,22 +175,135 @@ class DashboardContainer extends React.Component {
                 }
               />
             </GridItem>
-            <GridItem width={'1-3'}>
+          </Grid>
+
+          <Grid>
+            <GridItem width={'1-2'}>
               <TruCard
                 content={
                   <div>
-                    <div className='right uk-margin-top uk-margin-small-right'>
-                      <PeityLine values={'5,3,9,6,5,9,7,3,5,2'} />
+                    <div className='uk-flex uk-flex-middle uk-margin-bottom'>
+                      <div
+                        className='uk-flex uk-flex-center uk-flex-middle'
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          background: 'rgba(31,168,90,0.1)',
+                          marginRight: 14
+                        }}
+                      >
+                        <i className='material-icons' style={{ color: '#1fa85a' }}>
+                          trending_up
+                        </i>
+                      </div>
+                      <span className='uk-text-muted uk-text-small' style={{ fontSize: 14, letterSpacing: '0.02em' }}>
+                        AVERAGE COMPLETION TIME
+                      </span>
                     </div>
-                    <span className='uk-text-muted uk-text-small'>Avg Response Time</span>
 
-                    <h2 className='uk-margin-remove'>
-                      <CountUp endNumber={dashboardState.ticketAvg || 0} extraText={'hours'} />
+                    <h2 className='uk-margin-remove' style={{ fontSize: 32, lineHeight: 1.15, fontWeight: 700 }}>
+                      {stripMinutes(dashboardState.ticketAvgTodoToResolved || '0 Mins')}
                     </h2>
+
+                    <div className='uk-grid uk-grid-small uk-margin-top uk-margin-bottom' data-uk-grid>
+                      <div className='uk-width-1-2'>
+                        <div style={{ border: '1px solid #d8ebe0', borderRadius: 14, padding: '14px 16px' }}>
+                          <div className='uk-text-muted uk-text-small'>
+                            Fastest Completion
+                          </div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {stripMinutes(dashboardState.fastestTodoToResolved || '0 Mins')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className='uk-width-1-2'>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 14, padding: '14px 16px' }}>
+                          <div className='uk-text-muted uk-text-small'>
+                            Longest Completion
+                          </div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {stripMinutes(dashboardState.longestTodoToResolved || '0 Mins')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <hr className='uk-margin-small' />
+                    <div className='uk-grid uk-grid-small uk-text-muted' data-uk-grid>
+                      <div className='uk-width-1-3'>
+                        Closed: <strong style={{ color: '#1fa85a' }}>{dashboardState.totalClosed || 0}</strong>
+                      </div>
+                      <div className='uk-width-1-3'>
+                        Refunded: <strong style={{ color: '#d09a08' }}>{dashboardState.totalRefunded || 0}</strong>
+                      </div>
+                      <div className='uk-width-1-3'>
+                        Resolved: <strong style={{ color: '#2a6fd1' }}>{dashboardState.totalResolvedOnly || 0}</strong>
+                      </div>
+                    </div>
                   </div>
                 }
               />
             </GridItem>
+            <GridItem width={'1-2'}>
+              <TruCard
+                content={
+                  <div>
+                    <div className='uk-flex uk-flex-middle uk-margin-bottom'>
+                      <div
+                        className='uk-flex uk-flex-center uk-flex-middle'
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          background: 'rgba(42,111,209,0.1)',
+                          marginRight: 14
+                        }}
+                      >
+                        <i className='material-icons' style={{ color: '#2a6fd1' }}>
+                          timer
+                        </i>
+                      </div>
+                      <span className='uk-text-muted uk-text-small' style={{ fontSize: 14, letterSpacing: '0.02em' }}>
+                        AVERAGE RESPONSE TIMES
+                      </span>
+                    </div>
+
+                    <div className='uk-grid uk-grid-small' data-uk-grid>
+                      <div className='uk-width-1-1 uk-margin-small-bottom'>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
+                          <div className='uk-text-muted uk-text-small'>Todo -> Pending</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {dashboardState.ticketAvg || '0 Mins'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className='uk-width-1-1 uk-margin-small-bottom'>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
+                          <div className='uk-text-muted uk-text-small'>Pending -> In Progress</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {dashboardState.ticketAvgPendingToInProgress || '0 Mins'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className='uk-width-1-1'>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
+                          <div className='uk-text-muted uk-text-small'>In Progress -> Pending</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {dashboardState.ticketAvgInProgressToPending || '0 Mins'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+          </Grid>
+
+          <Grid>
             <GridItem width={'1-1'} extraClass={'uk-margin-medium-top'}>
               <TruCard
                 header={
