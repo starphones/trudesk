@@ -24,7 +24,6 @@ api.dashboard = {}
 api.dashboard.getData = payload => {
   const timespan = payload.timespan || 30
   return axios.get(`/api/v1/tickets/stats/${timespan}`).then(res => {
-    console.log(res.data,'asdasd')
     return res.data
   })
 }
@@ -37,6 +36,12 @@ api.dashboard.getTopGroups = payload => {
 api.dashboard.getTopTags = payload => {
   const timespan = payload.timespan || 30
   return axios.get(`/api/v1/tickets/count/tags/${timespan}`).then(res => {
+    return res.data
+  })
+}
+api.dashboard.getCompletedCount = payload => {
+  const timespan = payload.timespan || 30
+  return axios.get(`/api/v1/tickets/stats/completed/${timespan}`).then(res => {
     return res.data
   })
 }

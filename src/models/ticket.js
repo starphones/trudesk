@@ -1592,69 +1592,29 @@ ticketSchema.statics.getTopTicketGroups = function (timespan, top, callback) {
   const q = self
     .model(COLLECTION)
     .find(query)
-    .select('group')
-    .populate('group', 'name')
+    .select('countryState')
     .lean()
 
-  let topCount = []
-  const ticketsDb = []
+  return q.exec(function (err, tickets) {
+    if (err) return callback(err, null)
 
-  async.waterfall(
-    [
-      function (next) {
-        q.exec(function (err, t) {
-          if (err) return next(err)
-
-          const arr = []
-
-          for (let i = 0; i < t.length; i++) {
-            const ticket = t[i]
-            if (ticket.group) {
-              ticketsDb.push({
-                ticketId: ticket._id,
-                groupId: ticket.group._id
-              })
-              const o = {}
-              o._id = ticket.group._id
-              o.name = ticket.group.name
-
-              if (!_.filter(arr, { name: o.name }).length) {
-                arr.push(o)
-              }
-            }
-          }
-
-          return next(null, _.uniq(arr))
-        })
-      },
-      function (grps, next) {
-        for (let g = 0; g < grps.length; g++) {
-          const tickets = []
-          const grp = grps[g]
-          for (let i = 0; i < ticketsDb.length; i++) {
-            if (ticketsDb[i].groupId === grp._id) {
-              tickets.push(ticketsDb)
-            }
-          }
-
-          topCount.push({ name: grp.name, count: tickets.length })
-        }
-
-        topCount = _.sortBy(topCount, function (o) {
-          return -o.count
-        })
-
-        topCount = topCount.slice(0, top)
-
-        return next(null, topCount)
-      }
-    ],
-    function (err, result) {
-      if (err) return callback(err, null)
-
-      return callback(null, result)
+    const counts = {}
+    for (let i = 0; i < tickets.length; i++) {
+      const state = (tickets[i].countryState || '').trim().toUpperCase()
+      const key = state.length > 0 ? state : 'Unknown'
+      counts[key] = (counts[key] || 0) + 1
     }
-  )
+
+    let topCount = _.map(counts, function (count, name) {
+      return { name: name, count: count }
+    })
+
+    topCount = _.sortBy(topCount, function (o) {
+      return -o.count
+    }).slice(0, top)
+
+    return callback(null, topCount)
+  })
 }
 
 ticketSchema.statics.getTagCount = function (tagId, callback) {

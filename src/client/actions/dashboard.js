@@ -15,6 +15,7 @@
 import { createAction } from 'redux-actions'
 import {
   FETCH_DASHBOARD_DATA,
+  FETCH_DASHBOARD_COMPLETED_COUNT,
   FETCH_DASHBOARD_TOP_GROUPS,
   FETCH_DASHBOARD_TOP_TAGS,
   FETCH_DASHBOARD_OVERDUE_TICKETS
@@ -28,4 +29,5 @@ export const fetchDashboardData = createAction(
 
 export const fetchDashboardTopGroups = createAction(FETCH_DASHBOARD_TOP_GROUPS.ACTION, payload => payload)
 export const fetchDashboardTopTags = createAction(FETCH_DASHBOARD_TOP_TAGS.ACTION, payload => payload)
+export const fetchDashboardCompletedCount = createAction(FETCH_DASHBOARD_COMPLETED_COUNT.ACTION, payload => payload)
 export const fetchDashboardOverdueTickets = createAction(FETCH_DASHBOARD_OVERDUE_TICKETS.ACTION)

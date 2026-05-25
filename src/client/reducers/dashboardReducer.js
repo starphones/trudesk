@@ -16,6 +16,7 @@ import { fromJS, Map, List } from 'immutable'
 import { handleActions } from 'redux-actions'
 import { sortBy, map } from 'lodash'
 import {
+  FETCH_DASHBOARD_COMPLETED_COUNT,
   FETCH_DASHBOARD_DATA,
   FETCH_DASHBOARD_OVERDUE_TICKETS,
   FETCH_DASHBOARD_TOP_GROUPS,
@@ -33,6 +34,7 @@ const initialState = {
   ticketAvg: null,
   ticketCount: 0,
   closedCount: 0,
+  completedCount: 0,
 
   loadingTopGroups: false,
   topGroups: List([]),
@@ -105,6 +107,13 @@ const reducer = handleActions(
         ...state,
         loadingTopTags: false,
         topTags: fromJS(topTags)
+      }
+    },
+
+    [FETCH_DASHBOARD_COMPLETED_COUNT.SUCCESS]: (state, action) => {
+      return {
+        ...state,
+        completedCount: action.response && action.response.success ? action.response.count : 0
       }
     },
 

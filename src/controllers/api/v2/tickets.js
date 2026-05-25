@@ -59,10 +59,13 @@ ticketsV2.get = async (req, res) => {
     const mappedGroups = groups.map(g => g._id)
 
     const statuses = await ticketStatusSchema.find({ isResolved: false })
+    const escalatedStatus = await ticketStatusSchema.findOne({ name: /^escalated$/i })
 
     switch (type.toLowerCase()) {
       case 'active':
-        queryObject.status = statuses.map(i => i._id.toString())
+        queryObject.status = statuses
+          .filter(i => !escalatedStatus || i._id.toString() !== escalatedStatus._id.toString())
+          .map(i => i._id.toString())
         break
       case 'assigned':
         queryObject.filter = {
@@ -72,6 +75,10 @@ ticketsV2.get = async (req, res) => {
       case 'unassigned':
         queryObject.unassigned = true
         break
+      case 'escalated': {
+        queryObject.status = escalatedStatus ? [escalatedStatus._id.toString()] : []
+        break
+      }
       case 'new':
         queryObject.status = [0]
         break
