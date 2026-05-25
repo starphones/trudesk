@@ -58,74 +58,80 @@ function buildGraphData (arr, days, callback) {
   return callback(graphData)
 }
 
+function extractStatusName (historyItem) {
+  if (!historyItem) return null
+
+  if (_.isString(historyItem.action) && historyItem.action.indexOf('ticket:set:status:') === 0) {
+    return historyItem.action.replace('ticket:set:status:', '').trim().toLowerCase()
+  }
+
+  if (_.isString(historyItem.description)) {
+    const match = historyItem.description.match(/status set to:\s*(.+)$/i)
+    if (match && match[1]) return match[1].trim().toLowerCase()
+  }
+
+  return null
+}
+
+function normalizeStatus (status) {
+  return (status || '').toLowerCase().replace(/\s+/g, '')
+}
+
+function getBusinessSecondsBetween (startMoment, endMoment) {
+  if (!startMoment || !endMoment || !startMoment.isValid() || !endMoment.isValid()) return 0
+  if (endMoment.isBefore(startMoment)) return 0
+
+  // Sum only weekday duration between start and end.
+  let cursor = startMoment.clone()
+  let seconds = 0
+
+  while (cursor.isBefore(endMoment)) {
+    const endOfDay = cursor
+      .clone()
+      .endOf('day')
+      .add(1, 'second')
+    const chunkEnd = endOfDay.isBefore(endMoment) ? endOfDay : endMoment
+
+    // 0 = Sunday, 6 = Saturday
+    const day = cursor.day()
+    if (day !== 0 && day !== 6) {
+      seconds += chunkEnd.diff(cursor, 'seconds')
+    }
+
+    cursor = chunkEnd
+  }
+
+  return Math.max(0, seconds)
+}
+
+function buildStatusHistory (ticket) {
+  if (!ticket || ticket.history === undefined || ticket.history.length < 1) return []
+
+  return _.chain(ticket.history)
+    .map(function (h) {
+      return {
+        status: extractStatusName(h),
+        date: h && h.date ? moment(h.date) : null
+      }
+    })
+    .filter(function (h) {
+      return h.status && h.date && h.date.isValid()
+    })
+    .sortBy(function (h) {
+      return h.date.valueOf()
+    })
+    .value()
+}
+
 function buildAvgResponse (ticketArray, startStatuses, endStatuses, callback) {
   const cbObj = {}
   const $ticketAvg = []
   const normalizedStartStatuses = _.map(startStatuses || [], s => s.toLowerCase().replace(/\s+/g, ''))
   const normalizedEndStatuses = _.map(endStatuses || [], s => s.toLowerCase().replace(/\s+/g, ''))
 
-  const extractStatusName = historyItem => {
-    if (!historyItem) return null
-
-    if (_.isString(historyItem.action) && historyItem.action.indexOf('ticket:set:status:') === 0) {
-      return historyItem.action.replace('ticket:set:status:', '').trim().toLowerCase()
-    }
-
-    if (_.isString(historyItem.description)) {
-      const match = historyItem.description.match(/status set to:\s*(.+)$/i)
-      if (match && match[1]) return match[1].trim().toLowerCase()
-    }
-
-    return null
-  }
-
-  const normalizeStatus = status => (status || '').toLowerCase().replace(/\s+/g, '')
-
-  const getBusinessSecondsBetween = (startMoment, endMoment) => {
-    if (!startMoment || !endMoment || !startMoment.isValid() || !endMoment.isValid()) return 0
-    if (endMoment.isBefore(startMoment)) return 0
-
-    // Sum only weekday duration between start and end.
-    let cursor = startMoment.clone()
-    let seconds = 0
-
-    while (cursor.isBefore(endMoment)) {
-      const endOfDay = cursor
-        .clone()
-        .endOf('day')
-        .add(1, 'second')
-      const chunkEnd = endOfDay.isBefore(endMoment) ? endOfDay : endMoment
-
-      // 0 = Sunday, 6 = Saturday
-      const day = cursor.day()
-      if (day !== 0 && day !== 6) {
-        seconds += chunkEnd.diff(cursor, 'seconds')
-      }
-
-      cursor = chunkEnd
-    }
-
-    return Math.max(0, seconds)
-  }
-
   for (let i = 0; i < ticketArray.length; i++) {
     const ticket = ticketArray[i]
-    if (ticket.history === undefined || ticket.history.length < 1) continue
-
-    const statusHistory = _.chain(ticket.history)
-      .map(function (h) {
-        return {
-          status: extractStatusName(h),
-          date: h && h.date ? moment(h.date) : null
-        }
-      })
-      .filter(function (h) {
-        return h.status && h.date && h.date.isValid()
-      })
-      .sortBy(function (h) {
-        return h.date.valueOf()
-      })
-      .value()
+    const statusHistory = buildStatusHistory(ticket)
 
     if (statusHistory.length < 1) continue
 
@@ -161,6 +167,93 @@ function buildAvgResponse (ticketArray, startStatuses, endStatuses, callback) {
   cbObj.avgResponse = timeUtils.formatDurationWords(avgSeconds)
 
   return callback(cbObj)
+}
+
+function buildTodoToResolvedSummary (ticketArray, callback) {
+  const resolvedStatuses = ['closed', 'refunded', 'resolved']
+  const normalizedResolvedStatuses = _.map(resolvedStatuses, s => normalizeStatus(s))
+  const diffs = []
+  let totalResolved = 0
+  let totalClosed = 0
+  let totalRefunded = 0
+  let totalResolvedOnly = 0
+
+  for (let i = 0; i < ticketArray.length; i++) {
+    const ticket = ticketArray[i]
+    const statusHistory = buildStatusHistory(ticket)
+
+    let resolvedEvent = _.find(statusHistory, function (h) {
+      return normalizedResolvedStatuses.indexOf(normalizeStatus(h.status)) !== -1
+    })
+
+    // Fallback: some flows don't persist resolved names in history; closedDate is still reliable.
+    if (!resolvedEvent && ticket && ticket.closedDate) {
+      const closedDate = moment(ticket.closedDate)
+      if (closedDate.isValid()) {
+        resolvedEvent = {
+          status: 'resolved',
+          date: closedDate
+        }
+      }
+    }
+
+    if (!resolvedEvent || !resolvedEvent.date) continue
+
+    const resolvedStatus = normalizeStatus(resolvedEvent.status)
+    if (resolvedStatus === 'closed') totalClosed += 1
+    else if (resolvedStatus === 'refunded') totalRefunded += 1
+    else totalResolvedOnly += 1
+
+    totalResolved += 1
+
+    let todoEvent = _.find(statusHistory, function (h) {
+      return normalizeStatus(h.status) === 'todo' && h.date.isSameOrBefore(resolvedEvent.date)
+    })
+
+    // Fallback: if ticket was created in Todo and no explicit Todo history entry exists.
+    if (!todoEvent && ticket && ticket.date) {
+      const createdDate = moment(ticket.date)
+      if (createdDate.isValid() && createdDate.isSameOrBefore(resolvedEvent.date)) {
+        todoEvent = {
+          status: 'todo',
+          date: createdDate
+        }
+      }
+    }
+
+    if (!todoEvent || !todoEvent.date) continue
+
+    const diff = getBusinessSecondsBetween(todoEvent.date, resolvedEvent.date)
+    if (diff < 0) continue
+    diffs.push(diff)
+  }
+
+  const obj = {
+    totalResolved,
+    totalClosed,
+    totalRefunded,
+    totalResolvedOnly
+  }
+
+  if (diffs.length < 1) {
+    obj.avgResponse = timeUtils.formatDurationWords(0)
+    obj.fastestResponse = timeUtils.formatDurationWords(0)
+    obj.longestResponse = timeUtils.formatDurationWords(0)
+    return callback(obj)
+  }
+
+  const total = _.reduce(
+    diffs,
+    function (m, x) {
+      return m + x
+    },
+    0
+  )
+
+  obj.avgResponse = timeUtils.formatDurationWords(Math.round(total / diffs.length))
+  obj.fastestResponse = timeUtils.formatDurationWords(_.min(diffs))
+  obj.longestResponse = timeUtils.formatDurationWords(_.max(diffs))
+  return callback(obj)
 }
 
 const init = function (tickets, callback) {
@@ -223,16 +316,25 @@ const init = function (tickets, callback) {
                     ex.e365.avgInProgressToPending = obj2.avgResponse
                     buildAvgResponse(ex.e365.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
                       ex.e365.avgPendingToInProgress = obj3.avgResponse
-                      ex.e365.tickets = _.size(ex.e365.tickets)
-                      ex.e365.closedTickets = _.size(ex.e365.closedTickets)
+                      buildTodoToResolvedSummary(ex.e365.tickets, function (obj4) {
+                        ex.e365.avgTodoToResolved = obj4.avgResponse
+                        ex.e365.totalResolved = obj4.totalResolved
+                        ex.e365.totalClosed = obj4.totalClosed
+                        ex.e365.totalRefunded = obj4.totalRefunded
+                        ex.e365.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e365.fastestTodoToResolved = obj4.fastestResponse
+                        ex.e365.longestTodoToResolved = obj4.longestResponse
+                        ex.e365.tickets = _.size(ex.e365.tickets)
+                        ex.e365.closedTickets = _.size(ex.e365.closedTickets)
 
-                      // Remove all tickets more than 180 days
-                      const t180 = e180.toDate().getTime()
-                      $tickets = _.filter($tickets, function (t) {
-                        return t.date > t180
+                        // Remove all tickets more than 180 days
+                        const t180 = e180.toDate().getTime()
+                        $tickets = _.filter($tickets, function (t) {
+                          return t.date > t180
+                        })
+
+                        return c()
                       })
-
-                      return c()
                     })
                   })
                 })
@@ -257,16 +359,25 @@ const init = function (tickets, callback) {
                     ex.e180.avgInProgressToPending = obj2.avgResponse
                     buildAvgResponse(ex.e180.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
                       ex.e180.avgPendingToInProgress = obj3.avgResponse
-                      ex.e180.tickets = _.size(ex.e180.tickets)
-                      ex.e180.closedTickets = _.size(ex.e180.closedTickets)
+                      buildTodoToResolvedSummary(ex.e180.tickets, function (obj4) {
+                        ex.e180.avgTodoToResolved = obj4.avgResponse
+                        ex.e180.totalResolved = obj4.totalResolved
+                        ex.e180.totalClosed = obj4.totalClosed
+                        ex.e180.totalRefunded = obj4.totalRefunded
+                        ex.e180.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e180.fastestTodoToResolved = obj4.fastestResponse
+                        ex.e180.longestTodoToResolved = obj4.longestResponse
+                        ex.e180.tickets = _.size(ex.e180.tickets)
+                        ex.e180.closedTickets = _.size(ex.e180.closedTickets)
 
-                      // Remove all tickets more than 90 days
-                      const t90 = e90.toDate().getTime()
-                      $tickets = _.filter($tickets, function (t) {
-                        return t.date > t90
+                        // Remove all tickets more than 90 days
+                        const t90 = e90.toDate().getTime()
+                        $tickets = _.filter($tickets, function (t) {
+                          return t.date > t90
+                        })
+
+                        return c()
                       })
-
-                      return c()
                     })
                   })
                 })
@@ -291,16 +402,25 @@ const init = function (tickets, callback) {
                     ex.e90.avgInProgressToPending = obj2.avgResponse
                     buildAvgResponse(ex.e90.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
                       ex.e90.avgPendingToInProgress = obj3.avgResponse
-                      ex.e90.tickets = _.size(ex.e90.tickets)
-                      ex.e90.closedTickets = _.size(ex.e90.closedTickets)
+                      buildTodoToResolvedSummary(ex.e90.tickets, function (obj4) {
+                        ex.e90.avgTodoToResolved = obj4.avgResponse
+                        ex.e90.totalResolved = obj4.totalResolved
+                        ex.e90.totalClosed = obj4.totalClosed
+                        ex.e90.totalRefunded = obj4.totalRefunded
+                        ex.e90.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e90.fastestTodoToResolved = obj4.fastestResponse
+                        ex.e90.longestTodoToResolved = obj4.longestResponse
+                        ex.e90.tickets = _.size(ex.e90.tickets)
+                        ex.e90.closedTickets = _.size(ex.e90.closedTickets)
 
-                      // Remove all tickets more than 60 days
-                      const t60 = e60.toDate().getTime()
-                      $tickets = _.filter($tickets, function (t) {
-                        return t.date > t60
+                        // Remove all tickets more than 60 days
+                        const t60 = e60.toDate().getTime()
+                        $tickets = _.filter($tickets, function (t) {
+                          return t.date > t60
+                        })
+
+                        return c()
                       })
-
-                      return c()
                     })
                   })
                 })
@@ -325,16 +445,25 @@ const init = function (tickets, callback) {
                     ex.e60.avgInProgressToPending = obj2.avgResponse
                     buildAvgResponse(ex.e60.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
                       ex.e60.avgPendingToInProgress = obj3.avgResponse
-                      ex.e60.tickets = _.size(ex.e60.tickets)
-                      ex.e60.closedTickets = _.size(ex.e60.closedTickets)
+                      buildTodoToResolvedSummary(ex.e60.tickets, function (obj4) {
+                        ex.e60.avgTodoToResolved = obj4.avgResponse
+                        ex.e60.totalResolved = obj4.totalResolved
+                        ex.e60.totalClosed = obj4.totalClosed
+                        ex.e60.totalRefunded = obj4.totalRefunded
+                        ex.e60.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e60.fastestTodoToResolved = obj4.fastestResponse
+                        ex.e60.longestTodoToResolved = obj4.longestResponse
+                        ex.e60.tickets = _.size(ex.e60.tickets)
+                        ex.e60.closedTickets = _.size(ex.e60.closedTickets)
 
-                      // Remove all tickets more than 30 days
-                      const t30 = e30.toDate().getTime()
-                      $tickets = _.filter($tickets, function (t) {
-                        return t.date > t30
+                        // Remove all tickets more than 30 days
+                        const t30 = e30.toDate().getTime()
+                        $tickets = _.filter($tickets, function (t) {
+                          return t.date > t30
+                        })
+
+                        return c()
                       })
-
-                      return c()
                     })
                   })
                 })
@@ -359,10 +488,19 @@ const init = function (tickets, callback) {
                     ex.e30.avgInProgressToPending = obj2.avgResponse
                     buildAvgResponse(ex.e30.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
                       ex.e30.avgPendingToInProgress = obj3.avgResponse
-                      ex.e30.tickets = _.size(ex.e30.tickets)
-                      ex.e30.closedTickets = _.size(ex.e30.closedTickets)
+                      buildTodoToResolvedSummary(ex.e30.tickets, function (obj4) {
+                        ex.e30.avgTodoToResolved = obj4.avgResponse
+                        ex.e30.totalResolved = obj4.totalResolved
+                        ex.e30.totalClosed = obj4.totalClosed
+                        ex.e30.totalRefunded = obj4.totalRefunded
+                        ex.e30.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e30.fastestTodoToResolved = obj4.fastestResponse
+                        ex.e30.longestTodoToResolved = obj4.longestResponse
+                        ex.e30.tickets = _.size(ex.e30.tickets)
+                        ex.e30.closedTickets = _.size(ex.e30.closedTickets)
 
-                      return c()
+                        return c()
+                      })
                     })
                   })
                 })
