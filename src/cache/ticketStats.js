@@ -177,12 +177,24 @@ function buildTodoToResolvedSummary (ticketArray, callback) {
   let totalClosed = 0
   let totalRefunded = 0
   let totalResolvedOnly = 0
+  let totalTodo = 0
+  let totalPending = 0
+  let totalInProgress = 0
 
   for (let i = 0; i < ticketArray.length; i++) {
     const ticket = ticketArray[i]
     const statusHistory = buildStatusHistory(ticket)
 
-    let resolvedEvent = _.find(statusHistory, function (h) {
+    // Count latest-known status distribution for all tickets in this timespan
+    let latestStatus = null
+    if (statusHistory.length > 0) latestStatus = normalizeStatus(statusHistory[statusHistory.length - 1].status)
+    else if (ticket && ticket.closedDate) latestStatus = 'resolved'
+
+    if (latestStatus === 'todo') totalTodo += 1
+    if (latestStatus === 'pending') totalPending += 1
+    if (latestStatus === 'inprogress') totalInProgress += 1
+
+    let resolvedEvent = _.findLast(statusHistory, function (h) {
       return normalizedResolvedStatuses.indexOf(normalizeStatus(h.status)) !== -1
     })
 
@@ -232,7 +244,10 @@ function buildTodoToResolvedSummary (ticketArray, callback) {
     totalResolved,
     totalClosed,
     totalRefunded,
-    totalResolvedOnly
+    totalResolvedOnly,
+    totalTodo,
+    totalPending,
+    totalInProgress
   }
 
   if (diffs.length < 1) {
@@ -322,6 +337,9 @@ const init = function (tickets, callback) {
                         ex.e365.totalClosed = obj4.totalClosed
                         ex.e365.totalRefunded = obj4.totalRefunded
                         ex.e365.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e365.totalTodo = obj4.totalTodo
+                        ex.e365.totalPending = obj4.totalPending
+                        ex.e365.totalInProgress = obj4.totalInProgress
                         ex.e365.fastestTodoToResolved = obj4.fastestResponse
                         ex.e365.longestTodoToResolved = obj4.longestResponse
                         ex.e365.tickets = _.size(ex.e365.tickets)
@@ -365,6 +383,9 @@ const init = function (tickets, callback) {
                         ex.e180.totalClosed = obj4.totalClosed
                         ex.e180.totalRefunded = obj4.totalRefunded
                         ex.e180.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e180.totalTodo = obj4.totalTodo
+                        ex.e180.totalPending = obj4.totalPending
+                        ex.e180.totalInProgress = obj4.totalInProgress
                         ex.e180.fastestTodoToResolved = obj4.fastestResponse
                         ex.e180.longestTodoToResolved = obj4.longestResponse
                         ex.e180.tickets = _.size(ex.e180.tickets)
@@ -408,6 +429,9 @@ const init = function (tickets, callback) {
                         ex.e90.totalClosed = obj4.totalClosed
                         ex.e90.totalRefunded = obj4.totalRefunded
                         ex.e90.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e90.totalTodo = obj4.totalTodo
+                        ex.e90.totalPending = obj4.totalPending
+                        ex.e90.totalInProgress = obj4.totalInProgress
                         ex.e90.fastestTodoToResolved = obj4.fastestResponse
                         ex.e90.longestTodoToResolved = obj4.longestResponse
                         ex.e90.tickets = _.size(ex.e90.tickets)
@@ -451,6 +475,9 @@ const init = function (tickets, callback) {
                         ex.e60.totalClosed = obj4.totalClosed
                         ex.e60.totalRefunded = obj4.totalRefunded
                         ex.e60.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e60.totalTodo = obj4.totalTodo
+                        ex.e60.totalPending = obj4.totalPending
+                        ex.e60.totalInProgress = obj4.totalInProgress
                         ex.e60.fastestTodoToResolved = obj4.fastestResponse
                         ex.e60.longestTodoToResolved = obj4.longestResponse
                         ex.e60.tickets = _.size(ex.e60.tickets)
@@ -494,6 +521,9 @@ const init = function (tickets, callback) {
                         ex.e30.totalClosed = obj4.totalClosed
                         ex.e30.totalRefunded = obj4.totalRefunded
                         ex.e30.totalResolvedOnly = obj4.totalResolvedOnly
+                        ex.e30.totalTodo = obj4.totalTodo
+                        ex.e30.totalPending = obj4.totalPending
+                        ex.e30.totalInProgress = obj4.totalInProgress
                         ex.e30.fastestTodoToResolved = obj4.fastestResponse
                         ex.e30.longestTodoToResolved = obj4.longestResponse
                         ex.e30.tickets = _.size(ex.e30.tickets)
