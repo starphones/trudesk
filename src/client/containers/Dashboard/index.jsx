@@ -29,6 +29,15 @@ import moment from 'moment-timezone'
 import helpers from 'lib/helpers'
 
 const SHOW_DASHBOARD_MAINTENANCE_NOTICE = false
+const STATUS_IDS = {
+  todo: '69d5fc08cba9230a0926fff8',
+  inprogress: '69d5fc08cba9230a0926fff9',
+  pending: '69d5fc08cba9230a0926fffa',
+  resolved: '69d5fc08cba9230a0926fffb',
+  refund: '69d70f5633a3c86ce7482822',
+  closed: '69dde70ce628e832b70a8b72',
+  refunded: '69dde72ce628e832b70a8bd9'
+}
 
 @observer
 class DashboardContainer extends React.Component {
@@ -55,6 +64,12 @@ class DashboardContainer extends React.Component {
     this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
     this.props.fetchDashboardTopGroups({ timespan: e.target.value })
     this.props.fetchDashboardTopTags({ timespan: e.target.value })
+  }
+
+  getStatusFilterHref = statusKey => {
+    const statusId = STATUS_IDS[statusKey]
+    if (!statusId) return '#'
+    return `/tickets/filter/?f=1&st=${encodeURIComponent(statusId)}`
   }
 
   render () {
@@ -108,7 +123,7 @@ class DashboardContainer extends React.Component {
     const stripMinutes = value => {
       if (!value || typeof value !== 'string') return '0'
       const withoutMins = value.replace(/\s*\d+\s*mins?/i, '').trim()
-      return withoutMins.length > 0 ? withoutMins : '0'
+      return withoutMins.length > 0 ? withoutMins : '< 1h'
     }
 
     return (
@@ -206,9 +221,9 @@ class DashboardContainer extends React.Component {
                       {stripMinutes(dashboardState.ticketAvgTodoToResolved || '0 Mins')}
                     </h2>
 
-                    <div className='uk-grid uk-grid-small uk-margin-top uk-margin-bottom' data-uk-grid>
+                    <div className='uk-grid uk-grid-small uk-margin-medium-top uk-margin-medium-bottom' data-uk-grid>
                       <div className='uk-width-1-2'>
-                        <div style={{ border: '1px solid #d8ebe0', borderRadius: 14, padding: '14px 16px' }}>
+                        <div style={{ border: '1px solid #d8ebe0', borderRadius: 14, padding: '18px 20px' }}>
                           <div className='uk-text-muted uk-text-small'>
                             Fastest Completion
                           </div>
@@ -218,7 +233,7 @@ class DashboardContainer extends React.Component {
                         </div>
                       </div>
                       <div className='uk-width-1-2'>
-                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 14, padding: '14px 16px' }}>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 14, padding: '18px 20px' }}>
                           <div className='uk-text-muted uk-text-small'>
                             Longest Completion
                           </div>
@@ -229,16 +244,55 @@ class DashboardContainer extends React.Component {
                       </div>
                     </div>
 
-                    <hr className='uk-margin-small' />
-                    <div className='uk-grid uk-grid-small uk-text-muted' data-uk-grid>
+                    <hr className='uk-margin-medium' />
+                    <div className='uk-grid uk-grid-medium uk-text-muted uk-margin-top' data-uk-grid>
                       <div className='uk-width-1-3'>
-                        Closed: <strong style={{ color: '#1fa85a' }}>{dashboardState.totalClosed || 0}</strong>
+                        <a
+                          href={this.getStatusFilterHref('closed')}
+                          style={{ color: 'inherit' }}
+                        >
+                          Closed: <strong style={{ color: '#1fa85a' }}>{dashboardState.totalClosed || 0}</strong>
+                        </a>
                       </div>
                       <div className='uk-width-1-3'>
-                        Refunded: <strong style={{ color: '#d09a08' }}>{dashboardState.totalRefunded || 0}</strong>
+                        <a
+                          href={this.getStatusFilterHref('refunded')}
+                          style={{ color: 'inherit' }}
+                        >
+                          Refunded: <strong style={{ color: '#d09a08' }}>{dashboardState.totalRefunded || 0}</strong>
+                        </a>
                       </div>
                       <div className='uk-width-1-3'>
-                        Resolved: <strong style={{ color: '#2a6fd1' }}>{dashboardState.totalResolvedOnly || 0}</strong>
+                        <a
+                          href={this.getStatusFilterHref('resolved')}
+                          style={{ color: 'inherit' }}
+                        >
+                          Resolved: <strong style={{ color: '#2a6fd1' }}>{dashboardState.totalResolvedOnly || 0}</strong>
+                        </a>
+                      </div>
+                      <div className='uk-width-1-3'>
+                        <a
+                          href={this.getStatusFilterHref('todo')}
+                          style={{ color: 'inherit' }}
+                        >
+                          Todo: <strong>{dashboardState.totalTodo || 0}</strong>
+                        </a>
+                      </div>
+                      <div className='uk-width-1-3'>
+                        <a
+                          href={this.getStatusFilterHref('pending')}
+                          style={{ color: 'inherit' }}
+                        >
+                          Pending: <strong>{dashboardState.totalPending || 0}</strong>
+                        </a>
+                      </div>
+                      <div className='uk-width-1-3'>
+                        <a
+                          href={this.getStatusFilterHref('inprogress')}
+                          style={{ color: 'inherit' }}
+                        >
+                          In Progress: <strong>{dashboardState.totalInProgress || 0}</strong>
+                        </a>
                       </div>
                     </div>
                   </div>

@@ -263,6 +263,7 @@ ticketsController.filter = function (req, res, next) {
   let staffnames = queryString.sn
   let storeNames = queryString.ss
   let staffFaults = queryString.sf
+  let statusKeys = queryString.sk
 
   const rawNoPage = req.originalUrl.replace(/[?&]page=[^&#]*(#.*)?$/, '$1').replace(/([?&])page=[^&]*&/, '$1')
 
@@ -286,6 +287,8 @@ ticketsController.filter = function (req, res, next) {
   if (!_.isUndefined(storeNames) && !_.isArray(storeNames)) storeNames = [storeNames]
   if (!_.isUndefined(staffFaults)) staffFaults = xss(staffFaults)
   if (!_.isUndefined(staffFaults) && !_.isArray(staffFaults)) staffFaults = [staffFaults]
+  if (!_.isUndefined(statusKeys)) statusKeys = xss(statusKeys)
+  if (!_.isUndefined(statusKeys) && !_.isArray(statusKeys)) statusKeys = [statusKeys]
   if (!_.isUndefined(staffFaults)) {
     staffFaults = _.chain(staffFaults)
       .map(v => String(v).toLowerCase())
@@ -295,44 +298,81 @@ ticketsController.filter = function (req, res, next) {
       .value()
   }
 
-  const filter = {
-    uid: uid,
-    subject: xss(subject),
-    issue: issue,
-    date: {
-      start: dateStart,
-      end: dateEnd
-    },
-    status: status,
-    priority: priority,
-    groups: groups,
-    tags: tags,
-    types: types,
-    assignee: assignee,
-    ticketStates: ticketStates,
-    staffnames: staffnames,
-    storeNames: storeNames,
-    staffFaults: staffFaults,
-    raw: rawNoPage
+  const buildFilterProcessor = resolvedStatus => {
+    const filter = {
+      uid: uid,
+      subject: xss(subject),
+      issue: issue,
+      date: {
+        start: dateStart,
+        end: dateEnd
+      },
+      status: resolvedStatus,
+      priority: priority,
+      groups: groups,
+      tags: tags,
+      types: types,
+      assignee: assignee,
+      ticketStates: ticketStates,
+      staffnames: staffnames,
+      storeNames: storeNames,
+      staffFaults: staffFaults,
+      raw: rawNoPage
+    }
+
+    const processor = {}
+    processor.title = 'Tickets'
+    processor.nav = 'tickets'
+    processor.renderpage = 'tickets'
+    processor.pagetype = 'filter'
+    processor.filter = filter
+    processor.object = {
+      limit: 50,
+      page: page,
+      status: filter.status,
+      user: req.user._id,
+      filter: filter
+    }
+
+    req.processor = processor
+    return next()
   }
 
-  const processor = {}
-  processor.title = 'Tickets'
-  processor.nav = 'tickets'
-  processor.renderpage = 'tickets'
-  processor.pagetype = 'filter'
-  processor.filter = filter
-  processor.object = {
-    limit: 50,
-    page: page,
-    status: filter.status,
-    user: req.user._id,
-    filter: filter
+  if (_.isArray(status) && status.length > 0) return buildFilterProcessor(status)
+  if (!_.isArray(statusKeys) || statusKeys.length < 1) return buildFilterProcessor(status)
+
+  const ticketStatusSchema = require('../models/ticketStatus')
+  const normalizedKeys = _.uniq(
+    _.chain(statusKeys)
+      .map(s => String(s || '').toLowerCase().replace(/\s+/g, ''))
+      .filter(Boolean)
+      .value()
+  )
+  const keyAliases = {
+    todo: ['todo', 'new'],
+    pending: ['pending', 'awaiting'],
+    inprogress: ['inprogress', 'in progress', 'open'],
+    closed: ['closed'],
+    refunded: ['refunded', 'refund'],
+    resolved: ['resolved']
   }
 
-  req.processor = processor
+  ticketStatusSchema.find({}, function (err, statuses) {
+    if (err || !_.isArray(statuses)) return buildFilterProcessor(status)
 
-  return next()
+    const resolvedIds = []
+    _.each(normalizedKeys, function (key) {
+      const aliases = keyAliases[key] || [key]
+      const aliasNormalized = _.map(aliases, a => String(a).toLowerCase().replace(/\s+/g, ''))
+      const match = _.find(statuses, function (s) {
+        const name = String(_.get(s, 'name', '')).toLowerCase().replace(/\s+/g, '')
+        return _.some(aliasNormalized, a => name === a || name.indexOf(a) !== -1 || a.indexOf(name) !== -1)
+      })
+      if (match && match._id) resolvedIds.push(match._id.toString())
+    })
+
+    return buildFilterProcessor(resolvedIds.length > 0 ? _.uniq(resolvedIds) : status)
+  })
 }
 
 /**

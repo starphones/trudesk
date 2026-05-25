@@ -1849,6 +1849,9 @@ apiTickets.getTicketStats = function (req, res) {
       obj.totalClosed = cache.get('tickets:overview:e30:totalClosed')
       obj.totalRefunded = cache.get('tickets:overview:e30:totalRefunded')
       obj.totalResolvedOnly = cache.get('tickets:overview:e30:totalResolvedOnly')
+      obj.totalTodo = cache.get('tickets:overview:e30:totalTodo')
+      obj.totalPending = cache.get('tickets:overview:e30:totalPending')
+      obj.totalInProgress = cache.get('tickets:overview:e30:totalInProgress')
       obj.fastestTodoToResolved = cache.get('tickets:overview:e30:fastestTodoToResolved')
       obj.longestTodoToResolved = cache.get('tickets:overview:e30:longestTodoToResolved')
       break
@@ -1864,6 +1867,9 @@ apiTickets.getTicketStats = function (req, res) {
       obj.totalClosed = cache.get('tickets:overview:e60:totalClosed')
       obj.totalRefunded = cache.get('tickets:overview:e60:totalRefunded')
       obj.totalResolvedOnly = cache.get('tickets:overview:e60:totalResolvedOnly')
+      obj.totalTodo = cache.get('tickets:overview:e60:totalTodo')
+      obj.totalPending = cache.get('tickets:overview:e60:totalPending')
+      obj.totalInProgress = cache.get('tickets:overview:e60:totalInProgress')
       obj.fastestTodoToResolved = cache.get('tickets:overview:e60:fastestTodoToResolved')
       obj.longestTodoToResolved = cache.get('tickets:overview:e60:longestTodoToResolved')
       break
@@ -1879,6 +1885,9 @@ apiTickets.getTicketStats = function (req, res) {
       obj.totalClosed = cache.get('tickets:overview:e90:totalClosed')
       obj.totalRefunded = cache.get('tickets:overview:e90:totalRefunded')
       obj.totalResolvedOnly = cache.get('tickets:overview:e90:totalResolvedOnly')
+      obj.totalTodo = cache.get('tickets:overview:e90:totalTodo')
+      obj.totalPending = cache.get('tickets:overview:e90:totalPending')
+      obj.totalInProgress = cache.get('tickets:overview:e90:totalInProgress')
       obj.fastestTodoToResolved = cache.get('tickets:overview:e90:fastestTodoToResolved')
       obj.longestTodoToResolved = cache.get('tickets:overview:e90:longestTodoToResolved')
       break
@@ -1894,6 +1903,9 @@ apiTickets.getTicketStats = function (req, res) {
       obj.totalClosed = cache.get('tickets:overview:e180:totalClosed')
       obj.totalRefunded = cache.get('tickets:overview:e180:totalRefunded')
       obj.totalResolvedOnly = cache.get('tickets:overview:e180:totalResolvedOnly')
+      obj.totalTodo = cache.get('tickets:overview:e180:totalTodo')
+      obj.totalPending = cache.get('tickets:overview:e180:totalPending')
+      obj.totalInProgress = cache.get('tickets:overview:e180:totalInProgress')
       obj.fastestTodoToResolved = cache.get('tickets:overview:e180:fastestTodoToResolved')
       obj.longestTodoToResolved = cache.get('tickets:overview:e180:longestTodoToResolved')
       break
@@ -1909,6 +1921,9 @@ apiTickets.getTicketStats = function (req, res) {
       obj.totalClosed = cache.get('tickets:overview:e365:totalClosed')
       obj.totalRefunded = cache.get('tickets:overview:e365:totalRefunded')
       obj.totalResolvedOnly = cache.get('tickets:overview:e365:totalResolvedOnly')
+      obj.totalTodo = cache.get('tickets:overview:e365:totalTodo')
+      obj.totalPending = cache.get('tickets:overview:e365:totalPending')
+      obj.totalInProgress = cache.get('tickets:overview:e365:totalInProgress')
       obj.fastestTodoToResolved = cache.get('tickets:overview:e365:fastestTodoToResolved')
       obj.longestTodoToResolved = cache.get('tickets:overview:e365:longestTodoToResolved')
       break

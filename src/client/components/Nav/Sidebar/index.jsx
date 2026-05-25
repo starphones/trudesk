@@ -117,18 +117,6 @@ class Sidebar extends React.Component {
                     active={activeSubItem === 'tickets-active'}
                   />
                   <SubmenuItem
-                    text='Assigned'
-                    icon='assignment_ind'
-                    href='/tickets/assigned'
-                    active={activeSubItem === 'tickets-assigned'}
-                  />
-                  <SubmenuItem
-                    text='Unassigned'
-                    icon='person_add_disabled'
-                    href='/tickets/unassigned'
-                    active={activeSubItem === 'tickets-unassigned'}
-                  />
-                  <SubmenuItem
                     text='Escalated'
                     icon='priority_high'
                     href='/tickets/escalated'
