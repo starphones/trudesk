@@ -272,20 +272,22 @@ class DashboardContainer extends React.Component {
                     <div className='uk-grid uk-grid-small' data-uk-grid>
                       <div className='uk-width-1-1 uk-margin-small-bottom'>
                         <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
-                          <div className='uk-text-muted uk-text-small'>Pending -> In Progress</div>
-                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
-                            {dashboardState.ticketAvgPendingToInProgress || '0 Mins'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className='uk-width-1-1 uk-margin-small-bottom'>
-                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
                           <div className='uk-text-muted uk-text-small'>Todo -> Pending</div>
                           <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
                             {dashboardState.ticketAvg || '0 Mins'}
                           </div>
                         </div>
                       </div>
+                      
+                      <div className='uk-width-1-1 uk-margin-small-bottom'>
+                        <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
+                          <div className='uk-text-muted uk-text-small'>Pending -> In Progress</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>
+                            {dashboardState.ticketAvgPendingToInProgress || '0 Mins'}
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div className='uk-width-1-1'>
                         <div style={{ border: '1px solid #dbe4f3', borderRadius: 12, padding: '12px 14px' }}>
                           <div className='uk-text-muted uk-text-small'>In Progress -> Pending</div>
