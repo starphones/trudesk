@@ -32,6 +32,8 @@ const initialState = {
   mostCommenter: null,
   mostRequester: null,
   ticketAvg: null,
+  ticketAvgInProgressToPending: null,
+  ticketAvgPendingToInProgress: null,
   ticketCount: 0,
   closedCount: 0,
   completedCount: 0,
@@ -66,6 +68,8 @@ const reducer = handleActions(
         mostRequester: fromJS(action.response.mostRequester),
         mostAssignee: fromJS(action.response.mostAssignee),
         ticketAvg: fromJS(action.response.ticketAvg),
+        ticketAvgInProgressToPending: fromJS(action.response.ticketAvgInProgressToPending),
+        ticketAvgPendingToInProgress: fromJS(action.response.ticketAvgPendingToInProgress),
         ticketCount: action.response.ticketCount,
         closedCount: action.response.closedCount
       }

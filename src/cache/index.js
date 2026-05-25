@@ -91,26 +91,52 @@ truCache.refreshCache = function (callback) {
                 cache.set('tickets:overview:e30:ticketCount', stats.e30.tickets, expire)
                 cache.set('tickets:overview:e30:closedTickets', stats.e30.closedTickets, expire)
                 cache.set('tickets:overview:e30:responseTime', stats.e30.avgResponse, expire)
+                cache.set('tickets:overview:e30:responseTimeInProgressToPending', stats.e30.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e30:responseTimePendingToInProgress', stats.e30.avgPendingToInProgress, expire)
                 cache.set('tickets:overview:e30:graphData', stats.e30.graphData, expire)
 
                 cache.set('tickets:overview:e60:ticketCount', stats.e60.tickets, expire)
                 cache.set('tickets:overview:e60:closedTickets', stats.e60.closedTickets, expire)
                 cache.set('tickets:overview:e60:responseTime', stats.e60.avgResponse, expire)
+                cache.set('tickets:overview:e60:responseTimeInProgressToPending', stats.e60.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e60:responseTimePendingToInProgress', stats.e60.avgPendingToInProgress, expire)
                 cache.set('tickets:overview:e60:graphData', stats.e60.graphData, expire)
 
                 cache.set('tickets:overview:e90:ticketCount', stats.e90.tickets, expire)
                 cache.set('tickets:overview:e90:closedTickets', stats.e90.closedTickets, expire)
                 cache.set('tickets:overview:e90:responseTime', stats.e90.avgResponse, expire)
+                cache.set('tickets:overview:e90:responseTimeInProgressToPending', stats.e90.avgInProgressToPending, expire)
+                cache.set('tickets:overview:e90:responseTimePendingToInProgress', stats.e90.avgPendingToInProgress, expire)
                 cache.set('tickets:overview:e90:graphData', stats.e90.graphData, expire)
 
                 cache.set('tickets:overview:e180:ticketCount', stats.e180.tickets, expire)
                 cache.set('tickets:overview:e180:closedTickets', stats.e180.closedTickets, expire)
                 cache.set('tickets:overview:e180:responseTime', stats.e180.avgResponse, expire)
+                cache.set(
+                  'tickets:overview:e180:responseTimeInProgressToPending',
+                  stats.e180.avgInProgressToPending,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e180:responseTimePendingToInProgress',
+                  stats.e180.avgPendingToInProgress,
+                  expire
+                )
                 cache.set('tickets:overview:e180:graphData', stats.e180.graphData, expire)
 
                 cache.set('tickets:overview:e365:ticketCount', stats.e365.tickets, expire)
                 cache.set('tickets:overview:e365:closedTickets', stats.e365.closedTickets, expire)
                 cache.set('tickets:overview:e365:responseTime', stats.e365.avgResponse, expire)
+                cache.set(
+                  'tickets:overview:e365:responseTimeInProgressToPending',
+                  stats.e365.avgInProgressToPending,
+                  expire
+                )
+                cache.set(
+                  'tickets:overview:e365:responseTimePendingToInProgress',
+                  stats.e365.avgPendingToInProgress,
+                  expire
+                )
                 cache.set('tickets:overview:e365:graphData', stats.e365.graphData, expire)
 
                 return done()

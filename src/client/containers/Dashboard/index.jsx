@@ -136,7 +136,7 @@ class DashboardContainer extends React.Component {
         />
         <PageContent>
           <Grid>
-            <GridItem width={'1-3'}>
+            <GridItem width={'1-2'}>
               <TruCard
                 content={
                   <div>
@@ -154,7 +154,7 @@ class DashboardContainer extends React.Component {
                 }
               />
             </GridItem>
-            <GridItem width={'1-3'}>
+            <GridItem width={'1-2'}>
               <TruCard
                 content={
                   <div>
@@ -170,6 +170,25 @@ class DashboardContainer extends React.Component {
                 }
               />
             </GridItem>
+          </Grid>
+
+          <Grid>
+            <GridItem width={'1-3'}>
+              <TruCard
+                content={
+                  <div>
+                    <div className='right uk-margin-top uk-margin-small-right'>
+                      <PeityLine values={'3,2,4,6,5,7,4,5,3,4'} />
+                    </div>
+                    <span className='uk-text-muted uk-text-small'>{`Avg Response Time (Pending -> In Progress)`}</span>
+
+                    <h2 className='uk-margin-remove'>
+                      {this.props.dashboardState.ticketAvgPendingToInProgress || '0 Mins'}
+                    </h2>
+                  </div>
+                }
+              />
+            </GridItem>
             <GridItem width={'1-3'}>
               <TruCard
                 content={
@@ -177,7 +196,23 @@ class DashboardContainer extends React.Component {
                     <div className='right uk-margin-top uk-margin-small-right'>
                       <PeityLine values={'5,3,9,6,5,9,7,3,5,2'} />
                     </div>
-                    <span className='uk-text-muted uk-text-small'>Avg Response Time</span>
+                    <span className='uk-text-muted uk-text-small'>{`Avg Response Time (Todo -> Pending)`}</span>
+
+                    <h2 className='uk-margin-remove'>
+                      {this.props.dashboardState.ticketAvg || '0 Mins'}
+                    </h2>
+                  </div>
+                }
+              />
+            </GridItem>
+            <GridItem width={'1-3'}>
+              <TruCard
+                content={
+                  <div>
+                    <div className='right uk-margin-top uk-margin-small-right'>
+                      <PeityLine values={'2,4,3,7,5,8,6,4,3,5'} />
+                    </div>
+                    <span className='uk-text-muted uk-text-small'>{`Avg Response Time (In Progress -> Pending)`}</span>
 
                     <h2 className='uk-margin-remove'>
                       <CountUp endNumber={dashboardState.ticketAvg || 0} extraText={'hours'} />
@@ -186,6 +221,9 @@ class DashboardContainer extends React.Component {
                 }
               />
             </GridItem>
+          </Grid>
+
+          <Grid>
             <GridItem width={'1-1'} extraClass={'uk-margin-medium-top'}>
               <TruCard
                 header={

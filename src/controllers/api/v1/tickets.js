@@ -1842,30 +1842,40 @@ apiTickets.getTicketStats = function (req, res) {
       obj.ticketCount = cache.get('tickets:overview:e30:ticketCount')
       obj.closedCount = cache.get('tickets:overview:e30:closedTickets')
       obj.ticketAvg = cache.get('tickets:overview:e30:responseTime')
+      obj.ticketAvgInProgressToPending = cache.get('tickets:overview:e30:responseTimeInProgressToPending')
+      obj.ticketAvgPendingToInProgress = cache.get('tickets:overview:e30:responseTimePendingToInProgress')
       break
     case 60:
       obj.data = cache.get('tickets:overview:e60:graphData')
       obj.ticketCount = cache.get('tickets:overview:e60:ticketCount')
       obj.closedCount = cache.get('tickets:overview:e60:closedTickets')
       obj.ticketAvg = cache.get('tickets:overview:e60:responseTime')
+      obj.ticketAvgInProgressToPending = cache.get('tickets:overview:e60:responseTimeInProgressToPending')
+      obj.ticketAvgPendingToInProgress = cache.get('tickets:overview:e60:responseTimePendingToInProgress')
       break
     case 90:
       obj.data = cache.get('tickets:overview:e90:graphData')
       obj.ticketCount = cache.get('tickets:overview:e90:ticketCount')
       obj.closedCount = cache.get('tickets:overview:e90:closedTickets')
       obj.ticketAvg = cache.get('tickets:overview:e90:responseTime')
+      obj.ticketAvgInProgressToPending = cache.get('tickets:overview:e90:responseTimeInProgressToPending')
+      obj.ticketAvgPendingToInProgress = cache.get('tickets:overview:e90:responseTimePendingToInProgress')
       break
     case 180:
       obj.data = cache.get('tickets:overview:e180:graphData')
       obj.ticketCount = cache.get('tickets:overview:e180:ticketCount')
       obj.closedCount = cache.get('tickets:overview:e180:closedTickets')
       obj.ticketAvg = cache.get('tickets:overview:e180:responseTime')
+      obj.ticketAvgInProgressToPending = cache.get('tickets:overview:e180:responseTimeInProgressToPending')
+      obj.ticketAvgPendingToInProgress = cache.get('tickets:overview:e180:responseTimePendingToInProgress')
       break
     case 365:
       obj.data = cache.get('tickets:overview:e365:graphData')
       obj.ticketCount = cache.get('tickets:overview:e365:ticketCount')
       obj.closedCount = cache.get('tickets:overview:e365:closedTickets')
       obj.ticketAvg = cache.get('tickets:overview:e365:responseTime')
+      obj.ticketAvgInProgressToPending = cache.get('tickets:overview:e365:responseTimeInProgressToPending')
+      obj.ticketAvgPendingToInProgress = cache.get('tickets:overview:e365:responseTimePendingToInProgress')
       break
     // case 0:
     //     obj.data = cache.get('tickets:overview:lifetime:graphData');

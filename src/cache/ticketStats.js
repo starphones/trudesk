@@ -16,6 +16,7 @@ const _ = require('lodash')
 const async = require('async')
 const moment = require('moment')
 const winston = require('winston')
+const timeUtils = require('../helpers/time')
 
 const ticketSchema = require('../models/ticket')
 
@@ -57,18 +58,95 @@ function buildGraphData (arr, days, callback) {
   return callback(graphData)
 }
 
-function buildAvgResponse (ticketArray, callback) {
+function buildAvgResponse (ticketArray, startStatuses, endStatuses, callback) {
   const cbObj = {}
   const $ticketAvg = []
+  const normalizedStartStatuses = _.map(startStatuses || [], s => s.toLowerCase().replace(/\s+/g, ''))
+  const normalizedEndStatuses = _.map(endStatuses || [], s => s.toLowerCase().replace(/\s+/g, ''))
+
+  const extractStatusName = historyItem => {
+    if (!historyItem) return null
+
+    if (_.isString(historyItem.action) && historyItem.action.indexOf('ticket:set:status:') === 0) {
+      return historyItem.action.replace('ticket:set:status:', '').trim().toLowerCase()
+    }
+
+    if (_.isString(historyItem.description)) {
+      const match = historyItem.description.match(/status set to:\s*(.+)$/i)
+      if (match && match[1]) return match[1].trim().toLowerCase()
+    }
+
+    return null
+  }
+
+  const normalizeStatus = status => (status || '').toLowerCase().replace(/\s+/g, '')
+
+  const getBusinessSecondsBetween = (startMoment, endMoment) => {
+    if (!startMoment || !endMoment || !startMoment.isValid() || !endMoment.isValid()) return 0
+    if (endMoment.isBefore(startMoment)) return 0
+
+    // Sum only weekday duration between start and end.
+    let cursor = startMoment.clone()
+    let seconds = 0
+
+    while (cursor.isBefore(endMoment)) {
+      const endOfDay = cursor
+        .clone()
+        .endOf('day')
+        .add(1, 'second')
+      const chunkEnd = endOfDay.isBefore(endMoment) ? endOfDay : endMoment
+
+      // 0 = Sunday, 6 = Saturday
+      const day = cursor.day()
+      if (day !== 0 && day !== 6) {
+        seconds += chunkEnd.diff(cursor, 'seconds')
+      }
+
+      cursor = chunkEnd
+    }
+
+    return Math.max(0, seconds)
+  }
+
   for (let i = 0; i < ticketArray.length; i++) {
     const ticket = ticketArray[i]
-    if (ticket.comments === undefined || ticket.comments.length < 1) continue
+    if (ticket.history === undefined || ticket.history.length < 1) continue
 
-    const ticketDate = moment(ticket.date)
-    const firstCommentDate = moment(ticket.comments[0].date)
+    const statusHistory = _.chain(ticket.history)
+      .map(function (h) {
+        return {
+          status: extractStatusName(h),
+          date: h && h.date ? moment(h.date) : null
+        }
+      })
+      .filter(function (h) {
+        return h.status && h.date && h.date.isValid()
+      })
+      .sortBy(function (h) {
+        return h.date.valueOf()
+      })
+      .value()
 
-    const diff = firstCommentDate.diff(ticketDate, 'seconds')
+    if (statusHistory.length < 1) continue
+
+    const todoEvent = _.find(statusHistory, function (h) {
+      return normalizedStartStatuses.indexOf(normalizeStatus(h.status)) !== -1
+    })
+    if (!todoEvent) continue
+
+    const pendingEvent = _.find(statusHistory, function (h) {
+      return normalizedEndStatuses.indexOf(normalizeStatus(h.status)) !== -1 && h.date.isSameOrAfter(todoEvent.date)
+    })
+    if (!pendingEvent) continue
+
+    const diff = getBusinessSecondsBetween(todoEvent.date, pendingEvent.date)
+    if (diff < 0) continue
     $ticketAvg.push(diff)
+  }
+
+  if (_.size($ticketAvg) < 1) {
+    cbObj.avgResponse = timeUtils.formatDurationWords(0)
+    return callback(cbObj)
   }
 
   const ticketAvgTotal = _.reduce(
@@ -79,8 +157,8 @@ function buildAvgResponse (ticketArray, callback) {
     0
   )
 
-  const tvt = moment.duration(Math.round(ticketAvgTotal / _.size($ticketAvg)), 'seconds').asHours()
-  cbObj.avgResponse = Math.floor(tvt)
+  const avgSeconds = Math.round(ticketAvgTotal / _.size($ticketAvg))
+  cbObj.avgResponse = timeUtils.formatDurationWords(avgSeconds)
 
   return callback(cbObj)
 }
@@ -139,18 +217,24 @@ const init = function (tickets, callback) {
                 ex.e365.graphData = graphData
 
                 // Get average Response
-                buildAvgResponse(ex.e365.tickets, function (obj) {
+                buildAvgResponse(ex.e365.tickets, ['todo'], ['pending'], function (obj) {
                   ex.e365.avgResponse = obj.avgResponse
-                  ex.e365.tickets = _.size(ex.e365.tickets)
-                  ex.e365.closedTickets = _.size(ex.e365.closedTickets)
+                  buildAvgResponse(ex.e365.tickets, ['in progress', 'inprogress'], ['pending'], function (obj2) {
+                    ex.e365.avgInProgressToPending = obj2.avgResponse
+                    buildAvgResponse(ex.e365.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
+                      ex.e365.avgPendingToInProgress = obj3.avgResponse
+                      ex.e365.tickets = _.size(ex.e365.tickets)
+                      ex.e365.closedTickets = _.size(ex.e365.closedTickets)
 
-                  // Remove all tickets more than 180 days
-                  const t180 = e180.toDate().getTime()
-                  $tickets = _.filter($tickets, function (t) {
-                    return t.date > t180
+                      // Remove all tickets more than 180 days
+                      const t180 = e180.toDate().getTime()
+                      $tickets = _.filter($tickets, function (t) {
+                        return t.date > t180
+                      })
+
+                      return c()
+                    })
                   })
-
-                  return c()
                 })
               })
             },
@@ -167,18 +251,24 @@ const init = function (tickets, callback) {
               buildGraphData(ex.e180.tickets, 180, function (graphData) {
                 ex.e180.graphData = graphData
 
-                buildAvgResponse(ex.e180.tickets, function (obj) {
+                buildAvgResponse(ex.e180.tickets, ['todo'], ['pending'], function (obj) {
                   ex.e180.avgResponse = obj.avgResponse
-                  ex.e180.tickets = _.size(ex.e180.tickets)
-                  ex.e180.closedTickets = _.size(ex.e180.closedTickets)
+                  buildAvgResponse(ex.e180.tickets, ['in progress', 'inprogress'], ['pending'], function (obj2) {
+                    ex.e180.avgInProgressToPending = obj2.avgResponse
+                    buildAvgResponse(ex.e180.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
+                      ex.e180.avgPendingToInProgress = obj3.avgResponse
+                      ex.e180.tickets = _.size(ex.e180.tickets)
+                      ex.e180.closedTickets = _.size(ex.e180.closedTickets)
 
-                  // Remove all tickets more than 90 days
-                  const t90 = e90.toDate().getTime()
-                  $tickets = _.filter($tickets, function (t) {
-                    return t.date > t90
+                      // Remove all tickets more than 90 days
+                      const t90 = e90.toDate().getTime()
+                      $tickets = _.filter($tickets, function (t) {
+                        return t.date > t90
+                      })
+
+                      return c()
+                    })
                   })
-
-                  return c()
                 })
               })
             },
@@ -195,18 +285,24 @@ const init = function (tickets, callback) {
               buildGraphData(ex.e90.tickets, 90, function (graphData) {
                 ex.e90.graphData = graphData
 
-                buildAvgResponse(ex.e90.tickets, function (obj) {
+                buildAvgResponse(ex.e90.tickets, ['todo'], ['pending'], function (obj) {
                   ex.e90.avgResponse = obj.avgResponse
-                  ex.e90.tickets = _.size(ex.e90.tickets)
-                  ex.e90.closedTickets = _.size(ex.e90.closedTickets)
+                  buildAvgResponse(ex.e90.tickets, ['in progress', 'inprogress'], ['pending'], function (obj2) {
+                    ex.e90.avgInProgressToPending = obj2.avgResponse
+                    buildAvgResponse(ex.e90.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
+                      ex.e90.avgPendingToInProgress = obj3.avgResponse
+                      ex.e90.tickets = _.size(ex.e90.tickets)
+                      ex.e90.closedTickets = _.size(ex.e90.closedTickets)
 
-                  // Remove all tickets more than 60 days
-                  const t60 = e60.toDate().getTime()
-                  $tickets = _.filter($tickets, function (t) {
-                    return t.date > t60
+                      // Remove all tickets more than 60 days
+                      const t60 = e60.toDate().getTime()
+                      $tickets = _.filter($tickets, function (t) {
+                        return t.date > t60
+                      })
+
+                      return c()
+                    })
                   })
-
-                  return c()
                 })
               })
             },
@@ -223,18 +319,24 @@ const init = function (tickets, callback) {
               buildGraphData(ex.e60.tickets, 60, function (graphData) {
                 ex.e60.graphData = graphData
 
-                buildAvgResponse(ex.e60.tickets, function (obj) {
+                buildAvgResponse(ex.e60.tickets, ['todo'], ['pending'], function (obj) {
                   ex.e60.avgResponse = obj.avgResponse
-                  ex.e60.tickets = _.size(ex.e60.tickets)
-                  ex.e60.closedTickets = _.size(ex.e60.closedTickets)
+                  buildAvgResponse(ex.e60.tickets, ['in progress', 'inprogress'], ['pending'], function (obj2) {
+                    ex.e60.avgInProgressToPending = obj2.avgResponse
+                    buildAvgResponse(ex.e60.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
+                      ex.e60.avgPendingToInProgress = obj3.avgResponse
+                      ex.e60.tickets = _.size(ex.e60.tickets)
+                      ex.e60.closedTickets = _.size(ex.e60.closedTickets)
 
-                  // Remove all tickets more than 30 days
-                  const t30 = e30.toDate().getTime()
-                  $tickets = _.filter($tickets, function (t) {
-                    return t.date > t30
+                      // Remove all tickets more than 30 days
+                      const t30 = e30.toDate().getTime()
+                      $tickets = _.filter($tickets, function (t) {
+                        return t.date > t30
+                      })
+
+                      return c()
+                    })
                   })
-
-                  return c()
                 })
               })
             },
@@ -251,12 +353,18 @@ const init = function (tickets, callback) {
               buildGraphData(ex.e30.tickets, 30, function (graphData) {
                 ex.e30.graphData = graphData
 
-                buildAvgResponse(ex.e30.tickets, function (obj) {
+                buildAvgResponse(ex.e30.tickets, ['todo'], ['pending'], function (obj) {
                   ex.e30.avgResponse = obj.avgResponse
-                  ex.e30.tickets = _.size(ex.e30.tickets)
-                  ex.e30.closedTickets = _.size(ex.e30.closedTickets)
+                  buildAvgResponse(ex.e30.tickets, ['in progress', 'inprogress'], ['pending'], function (obj2) {
+                    ex.e30.avgInProgressToPending = obj2.avgResponse
+                    buildAvgResponse(ex.e30.tickets, ['pending'], ['in progress', 'inprogress'], function (obj3) {
+                      ex.e30.avgPendingToInProgress = obj3.avgResponse
+                      ex.e30.tickets = _.size(ex.e30.tickets)
+                      ex.e30.closedTickets = _.size(ex.e30.closedTickets)
 
-                  return c()
+                      return c()
+                    })
+                  })
                 })
               })
             }
