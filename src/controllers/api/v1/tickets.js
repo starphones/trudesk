@@ -25,6 +25,161 @@ var sanitizeHtml = require('sanitize-html')
 var apiTickets = {}
 var WEBHOOK_APP_URL = 'https://primary-production-06d0.up.railway.app'
 
+function sanitizeQueryValue (value) {
+  if (_.isArray(value)) {
+    return _.chain(value)
+      .map(function (item) {
+        return sanitizeQueryValue(item)
+      })
+      .flatten()
+      .compact()
+      .value()
+  }
+
+  if (_.isNil(value)) return value
+
+  return xss(String(value))
+}
+
+function toQueryArray (value) {
+  if (_.isNil(value) || value === '') return []
+
+  return _.chain(_.castArray(sanitizeQueryValue(value)))
+    .flatten()
+    .map(function (item) {
+      return String(item)
+        .split(',')
+        .map(function (part) {
+          return part.trim()
+        })
+    })
+    .flatten()
+    .filter(Boolean)
+    .uniq()
+    .value()
+}
+
+function toBooleanQueryValue (value) {
+  if (_.isBoolean(value)) return value
+  if (_.isNil(value)) return null
+
+  var normalized = String(value).toLowerCase().trim()
+  if (normalized === 'true' || normalized === '1') return true
+  if (normalized === 'false' || normalized === '0') return false
+
+  return null
+}
+
+function buildFilterFromQuery (query) {
+  var dateStart = sanitizeQueryValue(query.dateStart || query.startDate || query.ds)
+  var dateEnd = sanitizeQueryValue(query.dateEnd || query.endDate || query.de)
+  var filter = {}
+
+  var mapping = [
+    { target: 'uid', keys: ['uid'] },
+    { target: 'priority', keys: ['priority', 'priorities'] },
+    { target: 'groups', keys: ['group', 'groups'] },
+    { target: 'types', keys: ['type', 'types'] },
+    { target: 'tags', keys: ['tag', 'tags'] },
+    { target: 'assignee', keys: ['assignee'] },
+    { target: 'owner', keys: ['owner'] },
+    { target: 'ticketStates', keys: ['ticketState', 'ticketStates'] },
+    { target: 'staffnames', keys: ['staffname', 'staffnames'] },
+    { target: 'storeNames', keys: ['storeName', 'storeNames'] },
+    { target: 'staffFaults', keys: ['staffFault', 'staffFaults'] }
+  ]
+
+  _.each(mapping, function (entry) {
+    var rawValue = _.chain(entry.keys)
+      .map(function (key) {
+        return query[key]
+      })
+      .find(function (value) {
+        return !_.isNil(value) && value !== ''
+      })
+      .value()
+
+    var parsed = entry.target === 'uid' ? sanitizeQueryValue(rawValue) : toQueryArray(rawValue)
+    if (_.isArray(parsed) ? parsed.length > 0 : !_.isNil(parsed) && parsed !== '') filter[entry.target] = parsed
+  })
+
+  var subject = sanitizeQueryValue(query.subject)
+  if (subject) filter.subject = subject
+
+  var issue = sanitizeQueryValue(query.issue)
+  if (issue) filter.issue = issue
+
+  if (dateStart || dateEnd) {
+    filter.date = {}
+    if (dateStart) filter.date.start = dateStart
+    if (dateEnd) filter.date.end = dateEnd
+  }
+
+  var unassigned = toBooleanQueryValue(query.unassigned)
+  if (!_.isNull(unassigned)) filter.unassigned = unassigned
+
+  var assignedSelf = toBooleanQueryValue(query.assignedself)
+  if (!_.isNull(assignedSelf)) filter.assignedSelf = assignedSelf
+
+  return filter
+}
+
+function resolveStatusQuery (ticketStatusSchema, rawStatus, callback) {
+  var statusValues = toQueryArray(rawStatus)
+  if (statusValues.length < 1) return callback(null, [])
+
+  var objectIdLike = _.every(statusValues, function (value) {
+    return /^[a-fA-F0-9]{24}$/.test(String(value))
+  })
+
+  if (objectIdLike) return callback(null, statusValues)
+
+  var normalizedKeys = _.uniq(
+    _.chain(statusValues)
+      .map(function (s) {
+        return String(s || '').toLowerCase().replace(/\s+/g, '')
+      })
+      .filter(Boolean)
+      .value()
+  )
+
+  if (normalizedKeys.length < 1) return callback(null, [])
+
+  var keyAliases = {
+    todo: ['todo', 'new'],
+    pending: ['pending', 'awaiting'],
+    inprogress: ['inprogress', 'in progress', 'open'],
+    closed: ['closed'],
+    refunded: ['refunded', 'refund'],
+    resolved: ['resolved']
+  }
+
+  ticketStatusSchema.find({}, function (err, statuses) {
+    if (err) return callback(err)
+    if (!_.isArray(statuses)) return callback(null, [])
+
+    var resolvedIds = []
+    _.each(normalizedKeys, function (key) {
+      var aliases = keyAliases[key] || [key]
+      var aliasNormalized = _.map(aliases, function (alias) {
+        return String(alias).toLowerCase().replace(/\s+/g, '')
+      })
+
+      var match = _.find(statuses, function (status) {
+        var name = String(_.get(status, 'name', '')).toLowerCase().replace(/\s+/g, '')
+        var uid = String(_.get(status, 'uid', '')).toLowerCase().trim()
+        return _.some(aliasNormalized, function (alias) {
+          return name === alias || name.indexOf(alias) !== -1 || alias.indexOf(name) !== -1 || uid === alias
+        })
+      })
+
+      if (match && match._id) resolvedIds.push(match._id.toString())
+    })
+
+    return callback(null, _.uniq(resolvedIds))
+  })
+}
+
 function buildGraphData (arr, days, callback) {
   var graphData = []
   var today = moment()
@@ -143,21 +298,22 @@ apiTickets.get = function (req, res) {
   var l = req.query.limit ? req.query.limit : 10
   var limit = parseInt(l)
   var page = parseInt(req.query.page)
-  var assignedSelf = req.query.assignedself
-  var status = req.query.status
   var user = req.user
+  var filter = buildFilterFromQuery(req.query)
 
   var object = {
     user: user,
     limit: limit,
     page: page,
-    assignedSelf: assignedSelf,
-    status: status
+    assignedSelf: filter.assignedSelf,
+    unassigned: filter.unassigned,
+    filter: filter
   }
 
   var ticketModel = require('../../../models/ticket')
   var groupModel = require('../../../models/group')
   var departmentModel = require('../../../models/department')
+  var ticketStatusSchema = require('../../../models/ticketStatus')
 
   async.waterfall(
     [
@@ -184,6 +340,21 @@ apiTickets.get = function (req, res) {
         } else {
           return callback(null, grps)
         }
+      },
+      function (grps, callback) {
+        resolveStatusQuery(ticketStatusSchema, req.query.status, function (err, resolvedStatus) {
+          if (err) return callback(err)
+
+          if (resolvedStatus.length > 0) {
+            object.status = resolvedStatus
+            object.filter.status = resolvedStatus
+          } else if (req.query.status) {
+            object.status = ['000000000000000000000000']
+            object.filter.status = ['000000000000000000000000']
+          }
+
+          return callback(null, grps)
+        })
       },
       function (grps, callback) {
         ticketModel.getTicketsWithObject(grps, object, function (err, results) {
