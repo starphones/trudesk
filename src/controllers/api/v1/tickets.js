@@ -389,6 +389,7 @@ apiTickets.get = function (req, res) {
             })
 
             ticket.owner.role = ticket.owner.role._id
+            delete ticket.group
           })
 
           return callback(err, results)
