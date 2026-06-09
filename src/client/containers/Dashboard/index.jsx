@@ -2,7 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
 import { observer } from 'mobx-react'
-import { observable } from 'mobx'
+import { makeObservable, observable } from 'mobx'
 
 import {
   fetchDashboardCompletedCount,
@@ -27,6 +27,7 @@ import D3Pie from 'components/D3/d3pie'
 
 import moment from 'moment-timezone'
 import helpers from 'lib/helpers'
+import api from '../../api'
 
 const SHOW_DASHBOARD_MAINTENANCE_NOTICE = false
 const STATUS_IDS = {
@@ -42,19 +43,51 @@ const STATUS_IDS = {
 @observer
 class DashboardContainer extends React.Component {
   @observable timespan = 30
+  @observable employeeOverview = {
+    loading: false,
+    totalCount: 0,
+    productRelatedCount: 0,
+    repairRelatedCount: 0,
+    productTodoCount: 0,
+    productPendingCount: 0,
+    productInProgressCount: 0,
+    productClosedCount: 0,
+    productEscalatedCount: 0,
+    productCompletedCount: 0,
+    productAvgFirstResponse: '0 Mins',
+    productAvgCompletionTime: '0 Mins',
+    repairTodoCount: 0,
+    repairPendingCount: 0,
+    repairInProgressCount: 0,
+    repairClosedCount: 0,
+    repairEscalatedCount: 0,
+    repairCompletedCount: 0,
+    repairAvgFirstResponse: '0 Mins',
+    repairAvgCompletionTime: '0 Mins',
+    otherCount: 0,
+    productTypeId: null,
+    repairTypeId: null
+  }
 
   constructor (props) {
     super(props)
+    makeObservable(this)
   }
 
   componentDidMount () {
     helpers.UI.setupPeity()
 
     this.props.fetchDashboardData({ timespan: this.timespan })
-    this.props.fetchDashboardCompletedCount({ timespan: this.timespan })
-    this.props.fetchDashboardTopGroups({ timespan: this.timespan })
-    this.props.fetchDashboardTopTags({ timespan: this.timespan })
-    this.props.fetchDashboardOverdueTickets()
+
+    if (this.isEmployeeDashboard()) {
+      this.props.fetchDashboardCompletedCount({ timespan: this.timespan })
+      this.fetchEmployeeOverview()
+    } else {
+      this.props.fetchDashboardOverdueTickets()
+      this.props.fetchDashboardCompletedCount({ timespan: this.timespan })
+      this.props.fetchDashboardTopGroups({ timespan: this.timespan })
+      this.props.fetchDashboardTopTags({ timespan: this.timespan })
+    }
   }
 
   onTimespanChange = e => {
@@ -62,8 +95,13 @@ class DashboardContainer extends React.Component {
     this.timespan = e.target.value
     this.props.fetchDashboardData({ timespan: e.target.value })
     this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
-    this.props.fetchDashboardTopGroups({ timespan: e.target.value })
-    this.props.fetchDashboardTopTags({ timespan: e.target.value })
+
+    if (this.isEmployeeDashboard()) {
+      this.fetchEmployeeOverview()
+    } else {
+      this.props.fetchDashboardTopGroups({ timespan: e.target.value })
+      this.props.fetchDashboardTopTags({ timespan: e.target.value })
+    }
   }
 
   getStatusFilterHref = statusKey => {
@@ -72,7 +110,352 @@ class DashboardContainer extends React.Component {
     return `/tickets/filter/?f=1&st=${encodeURIComponent(statusId)}`
   }
 
+  getTypeFilterHref = typeId => {
+    if (!typeId) return '#'
+    return `/tickets/filter/?f=1&tt=${encodeURIComponent(typeId)}`
+  }
+
+  isEmployeeDashboard = () => {
+    return window.location.pathname.indexOf('/dashboard/employee') === 0
+  }
+
+  fetchEmployeeOverview = async () => {
+    this.employeeOverview = {
+      ...this.employeeOverview,
+      loading: true
+    }
+
+    try {
+      const response = await api.dashboard.getEmployeeOverview({ timespan: Number(this.timespan) })
+      this.employeeOverview = {
+        loading: false,
+        ...response
+      }
+    } catch (error) {
+      this.employeeOverview = {
+        ...this.employeeOverview,
+        loading: false
+      }
+
+      const errorText = error.response ? error.response.data.error : 'Unable to load employee dashboard overview.'
+      helpers.UI.showSnackbar(`Error: ${errorText}`, true)
+    }
+  }
+
+  renderOverdueTicketsTable = overdueTickets => {
+    return (
+      <div className='uk-overflow-container'>
+        <table className='uk-table'>
+          <thead>
+            <tr>
+              <th className='uk-text-nowrap'>Ticket</th>
+              <th className='uk-text-nowrap'>Status</th>
+              <th className='uk-text-nowrap'>Subject</th>
+              <th className='uk-text-nowrap uk-text-right'>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overdueTickets.map(ticket => {
+              return (
+                <tr key={ticket.get('_id')} className={'uk-table-middle'}>
+                  <td className={'uk-width-1-10 uk-text-nowrap'}>
+                    <a href={`/tickets/${ticket.get('uid')}`}>T#{ticket.get('uid')}</a>
+                  </td>
+                  <td className={'uk-width-1-10 uk-text-nowrap'}>
+                    <span className={'uk-badge ticket-status-open uk-width-1-1 ml-0'}>Open</span>
+                  </td>
+                  <td className={'uk-width-6-10'}>{ticket.get('subject')}</td>
+                  <td className={'uk-width-2-10 uk-text-right uk-text-muted uk-text-small'}>
+                    {moment
+                      .utc(ticket.get('updated'))
+                      .tz(helpers.getTimezone())
+                      .format(helpers.getShortDateFormat())}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  renderEmployeeDashboard = (dashboardState, lastUpdatedFormatted, completedCount) => {
+    const activeQueue = (dashboardState.totalTodo || 0) + (dashboardState.totalPending || 0) + (dashboardState.totalInProgress || 0)
+    const completionPercent = this.employeeOverview.totalCount
+      ? Math.round((completedCount / this.employeeOverview.totalCount) * 100)
+      : 0
+    const typeMixData = [
+      ['Product Related', this.employeeOverview.productRelatedCount || 0],
+      ['Repair Related', this.employeeOverview.repairRelatedCount || 0],
+      ['Other', this.employeeOverview.otherCount || 0]
+    ].filter(item => item[1] > 0)
+    const queueTileStyle = color => ({
+      border: `1px solid ${color}`,
+      borderRadius: 12,
+      padding: '18px 20px',
+      background: `${color}12`
+    })
+
+    return (
+      <div>
+        <PageTitle
+          title={'Employee Dashboard'}
+          rightComponent={
+            <div>
+              <div className={'uk-float-right'} style={{ minWidth: 250 }}>
+                <div style={{ marginTop: 8 }}>
+                  <SingleSelect
+                    items={[
+                      { text: 'Last 30 Days', value: '30' },
+                      { text: 'Last 60 Days', value: '60' },
+                      { text: 'Last 90 Days', value: '90' },
+                      { text: 'Last 180 Days', value: '180' },
+                      { text: 'Last 365 Days', value: '365' }
+                    ]}
+                    defaultValue={this.timespan.toString()}
+                    onSelectChange={e => this.onTimespanChange(e)}
+                  />
+                </div>
+              </div>
+              <div className={'uk-float-right uk-text-muted uk-text-small'} style={{ margin: '23px 25px 0 0' }}>
+                <strong>Last Updated: </strong>
+                <span>{lastUpdatedFormatted}</span>
+              </div>
+            </div>
+          }
+        />
+        <PageContent>
+          <Grid>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Overall Stats</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Product Related</div>
+                        <h2 className='uk-margin-remove'>
+                          <a href={this.getTypeFilterHref(this.employeeOverview.productTypeId)} style={{ color: 'inherit' }}>
+                            <CountUp startNumber={0} endNumber={this.employeeOverview.productRelatedCount || 0} />
+                          </a>
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Repair Related</div>
+                        <h2 className='uk-margin-remove'>
+                          <a href={this.getTypeFilterHref(this.employeeOverview.repairTypeId)} style={{ color: 'inherit' }}>
+                            <CountUp startNumber={0} endNumber={this.employeeOverview.repairRelatedCount || 0} />
+                          </a>
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Active Queue</div>
+                        <h2 className='uk-margin-remove'>
+                          <CountUp startNumber={0} endNumber={activeQueue} />
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Completed This Period</div>
+                        <h2 className='uk-margin-remove'>{completionPercent}%</h2>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Type Mix</h6>
+                  </div>
+                }
+                content={
+                  <div>
+                    <D3Pie type={'donut'} data={typeMixData} />
+                  </div>
+                }
+              />
+            </GridItem>
+          </Grid>
+
+          <Grid>
+            <GridItem width={'1-2'} extraClass={'uk-margin-medium-top'}>
+              <TruCard
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Product Related Performance</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#2563eb')}>
+                        <div className='uk-text-muted uk-text-small'>Avg First Response</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productAvgFirstResponse || '0 Mins'}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#0f766e')}>
+                        <div className='uk-text-muted uk-text-small'>Avg Completion Time</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productAvgCompletionTime || '0 Mins'}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#059669')}>
+                        <div className='uk-text-muted uk-text-small'>Completed</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productCompletedCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#dc2626')}>
+                        <div className='uk-text-muted uk-text-small'>Escalated</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productEscalatedCount || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+            <GridItem width={'1-2'} extraClass={'uk-margin-medium-top'}>
+              <TruCard
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Repair Related Performance</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#2563eb')}>
+                        <div className='uk-text-muted uk-text-small'>Avg First Response</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairAvgFirstResponse || '0 Mins'}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#0f766e')}>
+                        <div className='uk-text-muted uk-text-small'>Avg Completion Time</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairAvgCompletionTime || '0 Mins'}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#059669')}>
+                        <div className='uk-text-muted uk-text-small'>Completed</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairCompletedCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#dc2626')}>
+                        <div className='uk-text-muted uk-text-small'>Escalated</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairEscalatedCount || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+          </Grid>
+
+          <Grid>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Queue Snapshot - Product Related</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#4f6bed')}>
+                        <div className='uk-text-muted uk-text-small'>Todo</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productTodoCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#f59e0b')}>
+                        <div className='uk-text-muted uk-text-small'>Pending</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productPendingCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#10b981')}>
+                        <div className='uk-text-muted uk-text-small'>In Progress</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productInProgressCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#64748b')}>
+                        <div className='uk-text-muted uk-text-small'>Closed</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productClosedCount || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Queue Snapshot - Repair Related</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#4f6bed')}>
+                        <div className='uk-text-muted uk-text-small'>Todo</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairTodoCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={queueTileStyle('#f59e0b')}>
+                        <div className='uk-text-muted uk-text-small'>Pending</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairPendingCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#10b981')}>
+                        <div className='uk-text-muted uk-text-small'>In Progress</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairInProgressCount || 0}</div>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={queueTileStyle('#64748b')}>
+                        <div className='uk-text-muted uk-text-small'>Closed</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairClosedCount || 0}</div>
+                      </div>
+                    </div>
+                    
+                  </div>
+                }
+              />
+            </GridItem>
+          </Grid>
+        </PageContent>
+      </div>
+    )
+  }
+
   render () {
+    const isEmployeeDashboard = this.isEmployeeDashboard()
+
     if (SHOW_DASHBOARD_MAINTENANCE_NOTICE) {
       return (
         <div data-testid='dashboard-maintenance-notice'>
@@ -111,7 +494,7 @@ class DashboardContainer extends React.Component {
     const formatString = helpers.getLongDateFormat() + ' ' + helpers.getTimeFormat()
     const tz = helpers.getTimezone()
     const lastUpdatedFormatted = dashboardState.lastUpdated
-      ? moment(dashboardState.lastUpdated, 'MM/DD/YYYY hh:mm:ssa')
+      ? moment(dashboardState.lastUpdated, 'DD/MM/YYYY hh:mm:ssa')
           .tz(tz)
           .format(formatString)
       : 'Cache Still Loading...'
@@ -124,6 +507,10 @@ class DashboardContainer extends React.Component {
       if (!value || typeof value !== 'string') return '0'
       const withoutMins = value.replace(/\s*\d+\s*mins?/i, '').trim()
       return withoutMins.length > 0 ? withoutMins : '< 1h'
+    }
+
+    if (isEmployeeDashboard) {
+      return this.renderEmployeeDashboard(dashboardState, lastUpdatedFormatted, completedCount)
     }
 
     return (
@@ -142,7 +529,7 @@ class DashboardContainer extends React.Component {
                       { text: 'Last 180 Days', value: '180' },
                       { text: 'Last 365 Days', value: '365' }
                     ]}
-                    defaultValue={'30'}
+                    defaultValue={this.timespan.toString()}
                     onSelectChange={e => this.onTimespanChange(e)}
                   />
                 </div>
@@ -424,39 +811,7 @@ class DashboardContainer extends React.Component {
                   </div>
                 }
                 content={
-                  <div className='uk-overflow-container'>
-                    <table className='uk-table'>
-                      <thead>
-                        <tr>
-                          <th className='uk-text-nowrap'>Ticket</th>
-                          <th className='uk-text-nowrap'>Status</th>
-                          <th className='uk-text-nowrap'>Subject</th>
-                          <th className='uk-text-nowrap uk-text-right'>Last Updated</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {overdueTickets.map(ticket => {
-                          return (
-                            <tr key={ticket.get('_id')} className={'uk-table-middle'}>
-                              <td className={'uk-width-1-10 uk-text-nowrap'}>
-                                <a href={`/tickets/${ticket.get('uid')}`}>T#{ticket.get('uid')}</a>
-                              </td>
-                              <td className={'uk-width-1-10 uk-text-nowrap'}>
-                                <span className={'uk-badge ticket-status-open uk-width-1-1 ml-0'}>Open</span>
-                              </td>
-                              <td className={'uk-width-6-10'}>{ticket.get('subject')}</td>
-                              <td className={'uk-width-2-10 uk-text-right uk-text-muted uk-text-small'}>
-                                {moment
-                                  .utc(ticket.get('updated'))
-                                  .tz(helpers.getTimezone())
-                                  .format(helpers.getShortDateFormat())}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  this.renderOverdueTicketsTable(overdueTickets)
                 }
               />
             </GridItem>

@@ -50,6 +50,12 @@ api.dashboard.getOverdueTickets = () => {
     return res.data
   })
 }
+api.dashboard.getEmployeeOverview = async payload => {
+  const timespan = payload.timespan || 30
+  return axios.get(`/api/v1/tickets/stats/employee/${timespan}`).then(res => {
+    return res.data
+  })
+}
 
 api.tickets = {}
 api.tickets.getWithPage = payload => {

@@ -95,9 +95,28 @@ class Sidebar extends React.Component {
                 text='Dashboard'
                 icon='dashboard'
                 href='/dashboard'
-                class='navHome'
+                class='navHome no-ajaxy'
+                hasSubmenu={true}
+                subMenuTarget='dashboard'
                 active={activeItem === 'dashboard'}
-              />
+              >
+                <Submenu id='dashboard' subMenuOpen={activeItem === 'dashboard'}>
+                  <SubmenuItem
+                    text='Tickets Dashboard'
+                    icon='space_dashboard'
+                    href='/dashboard'
+                    className='no-ajaxy'
+                    active={activeSubItem === 'dashboard-tickets'}
+                  />
+                  <SubmenuItem
+                    text='Employee Dashboard'
+                    icon='groups'
+                    href='/dashboard/employee'
+                    className='no-ajaxy'
+                    active={activeSubItem === 'dashboard-employee'}
+                  />
+                </Submenu>
+              </SidebarItem>
             )}
             {sessionUser && Helpers.canUser('tickets:view') && (
               <SidebarItem
@@ -202,6 +221,12 @@ class Sidebar extends React.Component {
                 active={activeItem === 'reports'}
               >
                 <Submenu id='reports'>
+                  <SubmenuItem
+                    text='Dashboard'
+                    icon='dashboard'
+                    href='/dashboard'
+                    active={activeSubItem === 'reports-dashboard'}
+                  />
                   <SubmenuItem
                     text='Generate'
                     icon='timeline'

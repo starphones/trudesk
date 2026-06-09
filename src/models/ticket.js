@@ -922,7 +922,7 @@ function buildQueryWithObject (SELF, grpId, object, count) {
     )
 
   let query
-  if (count) query = SELF.model(COLLECTION).countDocuments({ groups: { $in: grpId }, deleted: false })
+  if (count) query = SELF.model(COLLECTION).countDocuments({ group: { $in: grpId }, deleted: false })
   else {
     query = SELF.model(COLLECTION)
       .find({ group: { $in: grpId }, deleted: false })

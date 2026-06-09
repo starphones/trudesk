@@ -23,6 +23,12 @@ const viewController = {}
 const viewdata = {}
 viewdata.users = {}
 
+function normalizeDateFormat (value, fallback) {
+  if (!value) return fallback
+  if (value === 'MM/DD/YYYY' || value === 'MMM DD, YYYY') return 'DD/MM/YYYY'
+  return value
+}
+
 viewController.getData = function (request, cb) {
   async.parallel(
     [
@@ -55,9 +61,9 @@ viewController.getData = function (request, cb) {
             function (done) {
               settingSchema.getSetting('gen:shortDateFormat', function (err, setting) {
                 if (!err && setting && setting.value) {
-                  viewdata.shortDateFormat = setting.value
+                  viewdata.shortDateFormat = normalizeDateFormat(setting.value, 'DD/MM/YYYY')
                 } else {
-                  viewdata.shortDateFormat = 'MM/DD/YYYY'
+                  viewdata.shortDateFormat = 'DD/MM/YYYY'
                 }
 
                 return done()
@@ -66,9 +72,9 @@ viewController.getData = function (request, cb) {
             function (done) {
               settingSchema.getSetting('gen:longDateFormat', function (err, setting) {
                 if (!err && setting && setting.value) {
-                  viewdata.longDateFormat = setting.value
+                  viewdata.longDateFormat = normalizeDateFormat(setting.value, 'DD/MM/YYYY')
                 } else {
-                  viewdata.longDateFormat = 'MMM DD, YYYY'
+                  viewdata.longDateFormat = 'DD/MM/YYYY'
                 }
 
                 return done()

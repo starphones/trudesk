@@ -82,6 +82,7 @@ module.exports = function (middleware, router, controllers) {
     apiCtrl.tickets.getCountByGroup
   )
   router.get('/api/v1/tickets/stats', apiv1, apiCtrl.tickets.getTicketStats)
+  router.get('/api/v1/tickets/stats/employee/:timespan', apiv1, apiCtrl.tickets.getEmployeeOverview)
   router.get('/api/v1/tickets/stats/completed', apiv1, apiCtrl.tickets.getCompletedTicketCount)
   router.get('/api/v1/tickets/stats/completed/:timespan', apiv1, apiCtrl.tickets.getCompletedTicketCount)
   router.get('/api/v1/tickets/stats/group/:group', apiv1, apiCtrl.tickets.getTicketStatsForGroup)

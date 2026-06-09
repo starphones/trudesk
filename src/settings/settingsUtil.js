@@ -32,6 +32,18 @@ function parseSetting (settings, name, defaultValue) {
   return s
 }
 
+function normalizeDateSetting (setting, fallback) {
+  if (!setting) return { value: fallback }
+
+  if (setting.value === 'MM/DD/YYYY' || setting.value === 'MMM DD, YYYY') {
+    setting.value = 'DD/MM/YYYY'
+  }
+
+  if (!setting.value) setting.value = fallback
+
+  return setting
+}
+
 util.setSetting = function (setting, value, callback) {
   const s = {
     name: setting,
@@ -56,8 +68,14 @@ util.getSettings = async callback => {
         s.siteUrl = parseSetting(settings, 'gen:siteurl', '')
         s.timezone = parseSetting(settings, 'gen:timezone', 'America/New_York')
         s.timeFormat = parseSetting(settings, 'gen:timeFormat', 'hh:mma')
-        s.shortDateFormat = parseSetting(settings, 'gen:shortDateFormat', 'MM/DD/YYYY')
-        s.longDateFormat = parseSetting(settings, 'gen:longDateFormat', 'MMM DD, YYYY')
+        s.shortDateFormat = normalizeDateSetting(
+          parseSetting(settings, 'gen:shortDateFormat', 'DD/MM/YYYY'),
+          'DD/MM/YYYY'
+        )
+        s.longDateFormat = normalizeDateSetting(
+          parseSetting(settings, 'gen:longDateFormat', 'DD/MM/YYYY'),
+          'DD/MM/YYYY'
+        )
 
         s.hasCustomLogo = parseSetting(settings, 'gen:customlogo', false)
         s.customLogoFilename = parseSetting(settings, 'gen:customlogofilename', '')
