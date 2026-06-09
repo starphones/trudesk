@@ -249,25 +249,44 @@ ticketSchema.methods.setStatus = function (ownerId, status, callback) {
         return reject(new Error('Invalid Status'))
       }
 
-      if (!status) {
+      const applyStatus = function (resolvedStatus) {
+        if (!resolvedStatus) {
+          if (typeof callback === 'function') return callback('Invalid Status')
+          return reject(new Error('Invalid Status'))
+        }
+
+        self.closedDate = resolvedStatus.isResolved ? new Date() : null
+        self.status = resolvedStatus._id
+
+        const historyItem = {
+          action: 'ticket:set:status:' + resolvedStatus.name,
+          description: 'Ticket Status set to: ' + resolvedStatus.name,
+          owner: ownerId
+        }
+
+        self.history.push(historyItem)
+
+        if (typeof callback === 'function') callback(null, self)
+
+        return resolve(self)
+      }
+
+      if (statusModel) return applyStatus(statusModel)
+
+      var statusUid = parseInt(status, 10)
+      if (_.isNaN(statusUid)) {
         if (typeof callback === 'function') return callback('Invalid Status')
         return reject(new Error('Invalid Status'))
       }
 
-      self.closedDate = statusModel.isResolved ? new Date() : null
-      self.status = status
+      return statusSchema.getStatusByUID(statusUid, function (uidErr, uidStatusModel) {
+        if (uidErr) {
+          if (typeof callback === 'function') return callback(uidErr)
+          return reject(new Error('Invalid Status'))
+        }
 
-      const historyItem = {
-        action: 'ticket:set:status:' + statusModel.name,
-        description: 'Ticket Status set to: ' + statusModel.name,
-        owner: ownerId
-      }
-
-      self.history.push(historyItem)
-
-      if (typeof callback === 'function') callback(null, self)
-
-      return resolve(self)
+        return applyStatus(uidStatusModel)
+      })
     })
   })
 }
