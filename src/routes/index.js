@@ -86,6 +86,13 @@ function mainRoutes (router, middleware, controllers) {
     middleware.loadCommonData,
     controllers.main.dashboard
   )
+  router.get(
+    '/dashboard/employee',
+    middleware.redirectToLogin,
+    middleware.redirectIfUser,
+    middleware.loadCommonData,
+    controllers.main.dashboard
+  )
 
   // Tickets
   router.get(

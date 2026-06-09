@@ -19,6 +19,7 @@ var axios = require('axios')
 var winston = require('../../../logger')
 var permissions = require('../../../permissions')
 var emitter = require('../../../emitter')
+var timeUtils = require('../../../helpers/time')
 var xss = require('xss')
 var sanitizeHtml = require('sanitize-html')
 
@@ -68,6 +69,176 @@ function toBooleanQueryValue (value) {
   if (normalized === 'false' || normalized === '0') return false
 
   return null
+}
+
+function extractTicketStatusName (historyItem) {
+  if (!historyItem) return null
+
+  if (_.isString(historyItem.action) && historyItem.action.indexOf('ticket:set:status:') === 0) {
+    return historyItem.action.replace('ticket:set:status:', '').trim().toLowerCase()
+  }
+
+  if (_.isString(historyItem.description)) {
+    var match = historyItem.description.match(/status set to:\s*(.+)$/i)
+    if (match && match[1]) return match[1].trim().toLowerCase()
+  }
+
+  return null
+}
+
+function normalizeStatusName (status) {
+  return (status || '').toLowerCase().replace(/\s+/g, '')
+}
+
+function getBusinessSecondsBetweenMoments (startMoment, endMoment) {
+  if (!startMoment || !endMoment || !startMoment.isValid() || !endMoment.isValid()) return 0
+  if (endMoment.isBefore(startMoment)) return 0
+
+  var cursor = startMoment.clone()
+  var seconds = 0
+
+  while (cursor.isBefore(endMoment)) {
+    var endOfDay = cursor
+      .clone()
+      .endOf('day')
+      .add(1, 'second')
+    var chunkEnd = endOfDay.isBefore(endMoment) ? endOfDay : endMoment
+    var day = cursor.day()
+
+    if (day !== 0 && day !== 6) {
+      seconds += chunkEnd.diff(cursor, 'seconds')
+    }
+
+    cursor = chunkEnd
+  }
+
+  return Math.max(0, seconds)
+}
+
+function buildTicketStatusHistory (ticket) {
+  if (!ticket || !ticket.history || ticket.history.length < 1) return []
+
+  return _.chain(ticket.history)
+    .map(function (h) {
+      return {
+        status: extractTicketStatusName(h),
+        date: h && h.date ? moment(h.date) : null
+      }
+    })
+    .filter(function (h) {
+      return h.status && h.date && h.date.isValid()
+    })
+    .sortBy(function (h) {
+      return h.date.valueOf()
+    })
+    .value()
+}
+
+function calculateAverageTransitionDuration (tickets, startStatuses, endStatuses) {
+  var normalizedStartStatuses = _.map(startStatuses || [], function (s) {
+    return normalizeStatusName(s)
+  })
+  var normalizedEndStatuses = _.map(endStatuses || [], function (s) {
+    return normalizeStatusName(s)
+  })
+  var diffs = []
+
+  _.each(tickets, function (ticket) {
+    var statusHistory = buildTicketStatusHistory(ticket)
+    if (statusHistory.length < 1) return
+
+    var startEvent = _.find(statusHistory, function (h) {
+      return normalizedStartStatuses.indexOf(normalizeStatusName(h.status)) !== -1
+    })
+    if (!startEvent) return
+
+    var endEvent = _.find(statusHistory, function (h) {
+      return normalizedEndStatuses.indexOf(normalizeStatusName(h.status)) !== -1 && h.date.isSameOrAfter(startEvent.date)
+    })
+    if (!endEvent) return
+
+    var diff = getBusinessSecondsBetweenMoments(startEvent.date, endEvent.date)
+    if (diff >= 0) diffs.push(diff)
+  })
+
+  if (diffs.length < 1) return timeUtils.formatDurationWords(0)
+
+  var total = _.reduce(
+    diffs,
+    function (memo, value) {
+      return memo + value
+    },
+    0
+  )
+
+  return timeUtils.formatDurationWords(Math.round(total / diffs.length))
+}
+
+function calculateAverageFirstResponseDuration (tickets) {
+  var diffs = []
+
+  _.each(tickets, function (ticket) {
+    if (!ticket || !ticket.date) return
+
+    var createdAt = moment(ticket.date)
+    if (!createdAt.isValid()) return
+
+    var statusHistory = buildTicketStatusHistory(ticket)
+    if (statusHistory.length < 1) return
+
+    var firstMeaningfulChange = _.find(statusHistory, function (h) {
+      var normalizedStatus = normalizeStatusName(h.status)
+      return normalizedStatus && normalizedStatus !== 'todo'
+    })
+
+    if (!firstMeaningfulChange) return
+
+    var diff = getBusinessSecondsBetweenMoments(createdAt, firstMeaningfulChange.date)
+    if (diff >= 0) diffs.push(diff)
+  })
+
+  if (diffs.length < 1) return timeUtils.formatDurationWords(0)
+
+  var total = _.reduce(
+    diffs,
+    function (memo, value) {
+      return memo + value
+    },
+    0
+  )
+
+  return timeUtils.formatDurationWords(Math.round(total / diffs.length))
+}
+
+function calculateAverageCompletionDuration (tickets, resolvedStatusIds) {
+  var diffs = []
+  var normalizedResolvedStatusIds = _.map(resolvedStatusIds || [], function (id) {
+    return id.toString()
+  })
+
+  _.each(tickets, function (ticket) {
+    if (!ticket || !ticket.date || !ticket.closedDate || !ticket.status) return
+
+    var createdAt = moment(ticket.date)
+    var closedAt = moment(ticket.closedDate)
+    if (!createdAt.isValid() || !closedAt.isValid()) return
+    if (normalizedResolvedStatusIds.length > 0 && normalizedResolvedStatusIds.indexOf(ticket.status.toString()) === -1) return
+
+    var diff = getBusinessSecondsBetweenMoments(createdAt, closedAt)
+    if (diff >= 0) diffs.push(diff)
+  })
+
+  if (diffs.length < 1) return timeUtils.formatDurationWords(0)
+
+  var total = _.reduce(
+    diffs,
+    function (memo, value) {
+      return memo + value
+    },
+    0
+  )
+
+  return timeUtils.formatDurationWords(Math.round(total / diffs.length))
 }
 
 function buildFilterFromQuery (query) {
@@ -2123,7 +2294,7 @@ apiTickets.getTicketStats = function (req, res) {
     obj.lastUpdated = moment
       .utc(obj.lastUpdated)
       .tz(tz)
-      .format('MM-DD-YYYY hh:mm:ssa')
+      .format('DD/MM/YYYY hh:mm:ssa')
 
     return res.send(obj)
   })
@@ -2172,6 +2343,241 @@ apiTickets.getCompletedTicketCount = function (req, res) {
       return res.json({ success: true, count: count })
     })
   })
+}
+
+apiTickets.getEmployeeOverview = function (req, res) {
+  var timespan = req.params.timespan ? parseInt(req.params.timespan) : 30
+  if (_.isNaN(timespan)) timespan = 30
+
+  var PRODUCT_RELATED_TYPE_ID = '69d5fc08cba9230a09270001'
+  var REPAIR_RELATED_TYPE_ID = '69d70c1233a3c86ce7481935'
+  var STATUS_IDS = {
+    todo: '69d5fc08cba9230a0926fff8',
+    inprogress: '69d5fc08cba9230a0926fff9',
+    pending: '69d5fc08cba9230a0926fffa',
+    resolved: '69d5fc08cba9230a0926fffb',
+    closed: '69dde70ce628e832b70a8b72',
+    refunded: '69dde72ce628e832b70a8bd9'
+  }
+  var user = req.user
+
+  var groupModel = require('../../../models/group')
+  var departmentModel = require('../../../models/department')
+  var TicketSchema = require('../../../models/ticket')
+  var ticketStatusSchema = require('../../../models/ticketStatus')
+
+  var today = moment()
+    .hour(23)
+    .minute(59)
+    .second(59)
+  var start = today.clone().subtract(timespan, 'd')
+
+  async.waterfall(
+    [
+      function (callback) {
+        if (user.role.isAdmin || user.role.isAgent) {
+          departmentModel.getDepartmentGroupsOfUser(user._id, function (err, groups) {
+            callback(err, groups)
+          })
+        } else {
+          groupModel.getAllGroupsOfUserNoPopulate(user._id, function (err, grps) {
+            callback(err, grps)
+          })
+        }
+      },
+      function (grps, callback) {
+        if (permissions.canThis(user.role, 'tickets:public')) {
+          groupModel.getAllPublicGroups(function (err, publicGroups) {
+            if (err) return callback(err)
+
+            grps = grps.concat(publicGroups)
+
+            return callback(null, grps)
+          })
+        } else {
+          return callback(null, grps)
+        }
+      },
+      function (grps, callback) {
+        var groupIds = _.chain(grps)
+          .map(function (g) {
+            return g && g._id ? g._id : null
+          })
+          .compact()
+          .uniqBy(function (id) {
+            return id.toString()
+          })
+          .value()
+
+        var baseQuery = {
+          deleted: false,
+          group: { $in: groupIds },
+          date: { $gte: start.toDate(), $lte: today.toDate() }
+        }
+
+        async.parallel(
+          {
+            escalatedStatus: function (done) {
+              ticketStatusSchema.findOne({ name: /^escalated$/i }, '_id', done)
+            },
+            resolvedStatuses: function (done) {
+              ticketStatusSchema.find({ isResolved: true }, '_id', done)
+            }
+          },
+          function (err, statusResults) {
+          if (err) return callback(err)
+            var escalatedStatus = statusResults.escalatedStatus
+            var resolvedStatuses = statusResults.resolvedStatuses || []
+            var resolvedStatusIds = _.map(resolvedStatuses, '_id')
+
+            async.parallel(
+              {
+              totalCount: function (done) {
+                TicketSchema.countDocuments(baseQuery, done)
+              },
+              resolvedStatuses: function (done) {
+                return done(null, resolvedStatuses)
+              },
+              productRelatedCount: function (done) {
+                TicketSchema.countDocuments(_.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID }), done)
+              },
+              repairRelatedCount: function (done) {
+                TicketSchema.countDocuments(_.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID }), done)
+              },
+              productTodoCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID, status: STATUS_IDS.todo }),
+                  done
+                )
+              },
+              productPendingCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID, status: STATUS_IDS.pending }),
+                  done
+                )
+              },
+              productInProgressCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID, status: STATUS_IDS.inprogress }),
+                  done
+                )
+              },
+              productClosedCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID, status: STATUS_IDS.closed }),
+                  done
+                )
+              },
+              productEscalatedCount: function (done) {
+                if (!escalatedStatus) return done(null, 0)
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID, status: escalatedStatus._id }),
+                  done
+                )
+              },
+              productCompletedCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, {
+                    type: PRODUCT_RELATED_TYPE_ID,
+                    status: { $in: resolvedStatusIds }
+                  }),
+                  done
+                )
+              },
+              productTickets: function (done) {
+                TicketSchema.find(_.extend({}, baseQuery, { type: PRODUCT_RELATED_TYPE_ID }), 'date closedDate history status')
+                  .lean()
+                  .exec(done)
+              },
+              repairTodoCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID, status: STATUS_IDS.todo }),
+                  done
+                )
+              },
+              repairPendingCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID, status: STATUS_IDS.pending }),
+                  done
+                )
+              },
+              repairInProgressCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID, status: STATUS_IDS.inprogress }),
+                  done
+                )
+              },
+              repairClosedCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID, status: STATUS_IDS.closed }),
+                  done
+                )
+              },
+              repairEscalatedCount: function (done) {
+                if (!escalatedStatus) return done(null, 0)
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID, status: escalatedStatus._id }),
+                  done
+                )
+              },
+              repairCompletedCount: function (done) {
+                TicketSchema.countDocuments(
+                  _.extend({}, baseQuery, {
+                    type: REPAIR_RELATED_TYPE_ID,
+                    status: { $in: resolvedStatusIds }
+                  }),
+                  done
+                )
+              },
+              repairTickets: function (done) {
+                TicketSchema.find(_.extend({}, baseQuery, { type: REPAIR_RELATED_TYPE_ID }), 'date closedDate history status')
+                  .lean()
+                  .exec(done)
+              }
+              },
+              callback
+            )
+          }
+        )
+      }
+    ],
+    function (err, counts) {
+      if (err) return res.status(400).json({ success: false, error: err.message || err })
+
+      var totalCount = counts.totalCount || 0
+      var productRelatedCount = counts.productRelatedCount || 0
+      var repairRelatedCount = counts.repairRelatedCount || 0
+      var productTickets = counts.productTickets || []
+      var repairTickets = counts.repairTickets || []
+
+      return res.json({
+        success: true,
+        timespan: timespan,
+        totalCount: totalCount,
+        productRelatedCount: productRelatedCount,
+        repairRelatedCount: repairRelatedCount,
+        productTodoCount: counts.productTodoCount || 0,
+        productPendingCount: counts.productPendingCount || 0,
+        productInProgressCount: counts.productInProgressCount || 0,
+        productClosedCount: counts.productClosedCount || 0,
+        productEscalatedCount: counts.productEscalatedCount || 0,
+        productCompletedCount: counts.productCompletedCount || 0,
+        productAvgFirstResponse: calculateAverageFirstResponseDuration(productTickets),
+        productAvgCompletionTime: calculateAverageCompletionDuration(productTickets, _.map(counts.resolvedStatuses || [], '_id')),
+        repairTodoCount: counts.repairTodoCount || 0,
+        repairPendingCount: counts.repairPendingCount || 0,
+        repairInProgressCount: counts.repairInProgressCount || 0,
+        repairClosedCount: counts.repairClosedCount || 0,
+        repairEscalatedCount: counts.repairEscalatedCount || 0,
+        repairCompletedCount: counts.repairCompletedCount || 0,
+        repairAvgFirstResponse: calculateAverageFirstResponseDuration(repairTickets),
+        repairAvgCompletionTime: calculateAverageCompletionDuration(repairTickets, _.map(counts.resolvedStatuses || [], '_id')),
+        otherCount: Math.max(totalCount - productRelatedCount - repairRelatedCount, 0),
+        productTypeId: PRODUCT_RELATED_TYPE_ID,
+        repairTypeId: REPAIR_RELATED_TYPE_ID
+      })
+    }
+  )
 }
 
 function parseTicketStats (role, tickets, callback) {

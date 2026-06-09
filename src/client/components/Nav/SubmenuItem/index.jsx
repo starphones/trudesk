@@ -21,7 +21,7 @@ class SubmenuItem extends React.Component {
       <div>
         {this.props.hasSeperator && <hr />}
         <li className={this.props.active ? ' active ' : ''}>
-          <a href={this.props.href}>
+          <a href={this.props.href} className={this.props.className}>
             <i className='material-icons fa-sub-icon'>{this.props.icon}</i>
             {this.props.text}
           </a>
@@ -35,6 +35,7 @@ SubmenuItem.propTypes = {
   href: PropTypes.string.isRequired,
   text: PropTypes.string.isRequired,
   icon: PropTypes.string.isRequired,
+  className: PropTypes.string,
   hasSeperator: PropTypes.bool,
   active: PropTypes.bool
 }

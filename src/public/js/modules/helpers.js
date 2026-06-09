@@ -302,6 +302,7 @@ define([
 
   helpers.UI.setupSidebarTether = function () {
     var sidebarElements = [
+      { element: '#side-nav-sub-dashboard', target: 'dashboard' },
       { element: '#side-nav-sub-tickets', target: 'tickets' },
       { element: '#side-nav-sub-accounts', target: 'accounts' },
       { element: '#side-nav-sub-reports', target: 'reports' },
@@ -1512,18 +1513,22 @@ define([
 
   helpers.getShortDateFormat = function () {
     if (window.trudeskSettingsService) {
-      return window.trudeskSettingsService.getSettings().shortDateFormat.value
+      var shortDateFormat = window.trudeskSettingsService.getSettings().shortDateFormat.value
+      if (shortDateFormat === 'MM/DD/YYYY') return 'DD/MM/YYYY'
+      return shortDateFormat
     }
 
-    return 'MM/DD/YYYY'
+    return 'DD/MM/YYYY'
   }
 
   helpers.getLongDateFormat = function () {
     if (window.trudeskSettingsService) {
-      return window.trudeskSettingsService.getSettings().longDateFormat.value
+      var longDateFormat = window.trudeskSettingsService.getSettings().longDateFormat.value
+      if (longDateFormat === 'MMM DD, YYYY') return 'DD/MM/YYYY'
+      return longDateFormat
     }
 
-    return 'MMM DD, YYYY'
+    return 'DD/MM/YYYY'
   }
 
   helpers.getTimeFormat = function () {
