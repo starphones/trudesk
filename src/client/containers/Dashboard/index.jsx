@@ -43,7 +43,7 @@ const STATUS_IDS = {
 @observer
 class DashboardContainer extends React.Component {
   @observable timespan = 30
-  @observable employeeOverview = {
+  @observable agentOverview = {
     loading: false,
     totalCount: 0,
     productRelatedCount: 0,
@@ -68,6 +68,21 @@ class DashboardContainer extends React.Component {
     productTypeId: null,
     repairTypeId: null
   }
+  @observable employeeOverview = {
+    loading: false,
+    totalCount: 0,
+    ticketsWithStaffNameCount: 0,
+    staffFaultYesCount: 0,
+    staffFaultNoCount: 0,
+    uniqueStaffCount: 0,
+    uniqueStoreCount: 0,
+    uniqueStateCount: 0,
+    topStaffFaults: [],
+    topStoreFaults: [],
+    topStateFaults: [],
+    topStores: [],
+    topStates: []
+  }
 
   constructor (props) {
     super(props)
@@ -79,8 +94,10 @@ class DashboardContainer extends React.Component {
 
     this.props.fetchDashboardData({ timespan: this.timespan })
 
-    if (this.isEmployeeDashboard()) {
+    if (this.isAgentDashboard()) {
       this.props.fetchDashboardCompletedCount({ timespan: this.timespan })
+      this.fetchAgentOverview()
+    } else if (this.isEmployeeDashboard()) {
       this.fetchEmployeeOverview()
     } else {
       this.props.fetchDashboardOverdueTickets()
@@ -94,11 +111,14 @@ class DashboardContainer extends React.Component {
     e.preventDefault()
     this.timespan = e.target.value
     this.props.fetchDashboardData({ timespan: e.target.value })
-    this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
 
-    if (this.isEmployeeDashboard()) {
+    if (this.isAgentDashboard()) {
+      this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
+      this.fetchAgentOverview()
+    } else if (this.isEmployeeDashboard()) {
       this.fetchEmployeeOverview()
     } else {
+      this.props.fetchDashboardCompletedCount({ timespan: e.target.value })
       this.props.fetchDashboardTopGroups({ timespan: e.target.value })
       this.props.fetchDashboardTopTags({ timespan: e.target.value })
     }
@@ -115,8 +135,35 @@ class DashboardContainer extends React.Component {
     return `/tickets/filter/?f=1&tt=${encodeURIComponent(typeId)}`
   }
 
+  isAgentDashboard = () => {
+    return window.location.pathname.indexOf('/dashboard/agent') === 0
+  }
+
   isEmployeeDashboard = () => {
     return window.location.pathname.indexOf('/dashboard/employee') === 0
+  }
+
+  fetchAgentOverview = async () => {
+    this.agentOverview = {
+      ...this.agentOverview,
+      loading: true
+    }
+
+    try {
+      const response = await api.dashboard.getAgentOverview({ timespan: Number(this.timespan) })
+      this.agentOverview = {
+        loading: false,
+        ...response
+      }
+    } catch (error) {
+      this.agentOverview = {
+        ...this.agentOverview,
+        loading: false
+      }
+
+      const errorText = error.response ? error.response.data.error : 'Unable to load agent dashboard overview.'
+      helpers.UI.showSnackbar(`Error: ${errorText}`, true)
+    }
   }
 
   fetchEmployeeOverview = async () => {
@@ -180,15 +227,15 @@ class DashboardContainer extends React.Component {
     )
   }
 
-  renderEmployeeDashboard = (dashboardState, lastUpdatedFormatted, completedCount) => {
+  renderAgentDashboard = (dashboardState, lastUpdatedFormatted, completedCount) => {
     const activeQueue = (dashboardState.totalTodo || 0) + (dashboardState.totalPending || 0) + (dashboardState.totalInProgress || 0)
-    const completionPercent = this.employeeOverview.totalCount
-      ? Math.round((completedCount / this.employeeOverview.totalCount) * 100)
+    const completionPercent = this.agentOverview.totalCount
+      ? Math.round((completedCount / this.agentOverview.totalCount) * 100)
       : 0
     const typeMixData = [
-      ['Product Related', this.employeeOverview.productRelatedCount || 0],
-      ['Repair Related', this.employeeOverview.repairRelatedCount || 0],
-      ['Other', this.employeeOverview.otherCount || 0]
+      ['Product Related', this.agentOverview.productRelatedCount || 0],
+      ['Repair Related', this.agentOverview.repairRelatedCount || 0],
+      ['Other', this.agentOverview.otherCount || 0]
     ].filter(item => item[1] > 0)
     const queueTileStyle = color => ({
       border: `1px solid ${color}`,
@@ -200,7 +247,7 @@ class DashboardContainer extends React.Component {
     return (
       <div>
         <PageTitle
-          title={'Employee Dashboard'}
+          title={'Agent Dashboard'}
           rightComponent={
             <div>
               <div className={'uk-float-right'} style={{ minWidth: 250 }}>
@@ -241,8 +288,8 @@ class DashboardContainer extends React.Component {
                       <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
                         <div className='uk-text-muted uk-text-small'>Product Related</div>
                         <h2 className='uk-margin-remove'>
-                          <a href={this.getTypeFilterHref(this.employeeOverview.productTypeId)} style={{ color: 'inherit' }}>
-                            <CountUp startNumber={0} endNumber={this.employeeOverview.productRelatedCount || 0} />
+                          <a href={this.getTypeFilterHref(this.agentOverview.productTypeId)} style={{ color: 'inherit' }}>
+                            <CountUp startNumber={0} endNumber={this.agentOverview.productRelatedCount || 0} />
                           </a>
                         </h2>
                       </div>
@@ -251,8 +298,8 @@ class DashboardContainer extends React.Component {
                       <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
                         <div className='uk-text-muted uk-text-small'>Repair Related</div>
                         <h2 className='uk-margin-remove'>
-                          <a href={this.getTypeFilterHref(this.employeeOverview.repairTypeId)} style={{ color: 'inherit' }}>
-                            <CountUp startNumber={0} endNumber={this.employeeOverview.repairRelatedCount || 0} />
+                          <a href={this.getTypeFilterHref(this.agentOverview.repairTypeId)} style={{ color: 'inherit' }}>
+                            <CountUp startNumber={0} endNumber={this.agentOverview.repairRelatedCount || 0} />
                           </a>
                         </h2>
                       </div>
@@ -305,25 +352,25 @@ class DashboardContainer extends React.Component {
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#2563eb')}>
                         <div className='uk-text-muted uk-text-small'>Avg First Response</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productAvgFirstResponse || '0 Mins'}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.productAvgFirstResponse || '0 Mins'}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#0f766e')}>
                         <div className='uk-text-muted uk-text-small'>Avg Completion Time</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productAvgCompletionTime || '0 Mins'}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.productAvgCompletionTime || '0 Mins'}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#059669')}>
                         <div className='uk-text-muted uk-text-small'>Completed</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productCompletedCount || 0}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.productCompletedCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#dc2626')}>
                         <div className='uk-text-muted uk-text-small'>Escalated</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.productEscalatedCount || 0}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.productEscalatedCount || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -342,25 +389,25 @@ class DashboardContainer extends React.Component {
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#2563eb')}>
                         <div className='uk-text-muted uk-text-small'>Avg First Response</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairAvgFirstResponse || '0 Mins'}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.repairAvgFirstResponse || '0 Mins'}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#0f766e')}>
                         <div className='uk-text-muted uk-text-small'>Avg Completion Time</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairAvgCompletionTime || '0 Mins'}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.repairAvgCompletionTime || '0 Mins'}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#059669')}>
                         <div className='uk-text-muted uk-text-small'>Completed</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairCompletedCount || 0}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.repairCompletedCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#dc2626')}>
                         <div className='uk-text-muted uk-text-small'>Escalated</div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.employeeOverview.repairEscalatedCount || 0}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{this.agentOverview.repairEscalatedCount || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -383,25 +430,25 @@ class DashboardContainer extends React.Component {
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#4f6bed')}>
                         <div className='uk-text-muted uk-text-small'>Todo</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productTodoCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.productTodoCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#f59e0b')}>
                         <div className='uk-text-muted uk-text-small'>Pending</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productPendingCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.productPendingCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#10b981')}>
                         <div className='uk-text-muted uk-text-small'>In Progress</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productInProgressCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.productInProgressCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#64748b')}>
                         <div className='uk-text-muted uk-text-small'>Closed</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.productClosedCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.productClosedCount || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -421,25 +468,25 @@ class DashboardContainer extends React.Component {
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#4f6bed')}>
                         <div className='uk-text-muted uk-text-small'>Todo</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairTodoCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.repairTodoCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2'>
                       <div style={queueTileStyle('#f59e0b')}>
                         <div className='uk-text-muted uk-text-small'>Pending</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairPendingCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.repairPendingCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#10b981')}>
                         <div className='uk-text-muted uk-text-small'>In Progress</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairInProgressCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.repairInProgressCount || 0}</div>
                       </div>
                     </div>
                     <div className='uk-width-1-2 uk-margin-top'>
                       <div style={queueTileStyle('#64748b')}>
                         <div className='uk-text-muted uk-text-small'>Closed</div>
-                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.employeeOverview.repairClosedCount || 0}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700 }}>{this.agentOverview.repairClosedCount || 0}</div>
                       </div>
                     </div>
                     
@@ -453,7 +500,193 @@ class DashboardContainer extends React.Component {
     )
   }
 
+  renderRankedList = (items, emptyText) => {
+    if (!items || items.length < 1) {
+      return <div className='uk-text-muted uk-text-small'>{emptyText}</div>
+    }
+
+    return (
+      <div>
+        {items.map((item, index) => (
+          <div
+            key={`${item.name}-${index}`}
+            className='uk-flex uk-flex-between uk-flex-middle'
+            style={{
+              padding: '10px 0',
+              borderBottom: index === items.length - 1 ? 'none' : '1px solid #eef1f6'
+            }}
+          >
+            <span style={{ fontWeight: 500 }}>{item.name}</span>
+            <span className='uk-text-muted'>{item.count}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  renderStaffFaultList = (items, emptyText) => {
+    if (!items || items.length < 1) {
+      return <div className='uk-text-muted uk-text-small'>{emptyText}</div>
+    }
+
+    return (
+      <div>
+        {items.map((item, index) => (
+          <div
+            key={`${item.name}-${index}`}
+            style={{
+              padding: '10px 0',
+              borderBottom: index === items.length - 1 ? 'none' : '1px solid #eef1f6'
+            }}
+          >
+            <div style={{ fontWeight: 500, marginBottom: 4 }}>{item.name}</div>
+            <div className='uk-text-muted uk-text-small'>
+              Total: {item.totalCount || 0} - Yes: {item.yesCount || 0}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  renderEmployeeDashboard = lastUpdatedFormatted => {
+    const overview = this.employeeOverview
+    const stateMixData = (overview.topStateFaults || [])
+      .map(item => [item.name, item.yesCount])
+      .filter(item => item[1] > 0)
+    const ticketsWithoutStaffNameCount = Math.max((overview.totalCount || 0) - (overview.ticketsWithStaffNameCount || 0), 0)
+
+    return (
+      <div>
+        <PageTitle
+          title={'Employee Dashboard'}
+          rightComponent={
+            <div>
+              <div className={'uk-float-right'} style={{ minWidth: 250 }}>
+                <div style={{ marginTop: 8 }}>
+                  <SingleSelect
+                    items={[
+                      { text: 'Last 30 Days', value: '30' },
+                      { text: 'Last 60 Days', value: '60' },
+                      { text: 'Last 90 Days', value: '90' },
+                      { text: 'Last 180 Days', value: '180' },
+                      { text: 'Last 365 Days', value: '365' }
+                    ]}
+                    defaultValue={this.timespan.toString()}
+                    onSelectChange={e => this.onTimespanChange(e)}
+                  />
+                </div>
+              </div>
+              <div className={'uk-float-right uk-text-muted uk-text-small'} style={{ margin: '23px 25px 0 0' }}>
+                <strong>Last Updated: </strong>
+                <span>{lastUpdatedFormatted}</span>
+              </div>
+            </div>
+          }
+        />
+        <PageContent>
+          <Grid>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Employee Ticket Overview</h6>
+                  </div>
+                }
+                content={
+                  <div className='uk-grid uk-grid-small' data-uk-grid>
+                    <div className='uk-width-1-2'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Total Tickets</div>
+                        <h2 className='uk-margin-remove'>
+                          <CountUp startNumber={0} endNumber={overview.totalCount || 0} />
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Tickets Without Assignee</div>
+                        <h2 className='uk-margin-remove'>
+                          <CountUp startNumber={0} endNumber={ticketsWithoutStaffNameCount} />
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Staff Fault Yes</div>
+                        <h2 className='uk-margin-remove'>
+                          <CountUp startNumber={0} endNumber={overview.staffFaultYesCount || 0} />
+                        </h2>
+                      </div>
+                    </div>
+                    <div className='uk-width-1-2 uk-margin-top'>
+                      <div style={{ border: '1px solid #eceff5', borderRadius: 12, padding: '18px 20px' }}>
+                        <div className='uk-text-muted uk-text-small'>Staff Fault No</div>
+                        <h2 className='uk-margin-remove'>
+                          <CountUp startNumber={0} endNumber={overview.staffFaultNoCount || 0} />
+                        </h2>
+                      </div>
+                    </div>
+                  </div>
+                }
+              />
+            </GridItem>
+            <GridItem width={'1-2'}>
+              <TruCard
+                style={{ minHeight: 300 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Percentage of State with Fault</h6>
+                  </div>
+                }
+                content={<div>{stateMixData.length > 0 ? <D3Pie type={'donut'} data={stateMixData} /> : <div className='uk-text-muted uk-text-small'>No state data for this period.</div>}</div>}
+              />
+            </GridItem>
+          </Grid>
+
+          <Grid>
+            <GridItem width={'1-3'} extraClass={'uk-margin-medium-top'}>
+              <TruCard
+                style={{ minHeight: 320 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Top Staff With Fault</h6>
+                  </div>
+                }
+                content={this.renderStaffFaultList(overview.topStaffFaults, 'No staff fault data found for this period.')}
+              />
+            </GridItem>
+            <GridItem width={'1-3'} extraClass={'uk-margin-medium-top'}>
+              <TruCard
+                style={{ minHeight: 320 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Top Stores With Fault</h6>
+                  </div>
+                }
+                content={this.renderStaffFaultList(overview.topStoreFaults, 'No store fault data found for this period.')}
+              />
+            </GridItem>
+            <GridItem width={'1-3'} extraClass={'uk-margin-medium-top'}>
+              <TruCard
+                style={{ minHeight: 320 }}
+                header={
+                  <div className='uk-text-left'>
+                    <h6 style={{ padding: 15, margin: 0, fontSize: '14px' }}>Top States With Fault</h6>
+                  </div>
+                }
+                content={this.renderStaffFaultList(overview.topStateFaults, 'No state fault data found for this period.')}
+              />
+            </GridItem>
+          </Grid>
+        </PageContent>
+      </div>
+    )
+  }
+
   render () {
+    const isAgentDashboard = this.isAgentDashboard()
     const isEmployeeDashboard = this.isEmployeeDashboard()
 
     if (SHOW_DASHBOARD_MAINTENANCE_NOTICE) {
@@ -509,8 +742,12 @@ class DashboardContainer extends React.Component {
       return withoutMins.length > 0 ? withoutMins : '< 1h'
     }
 
+    if (isAgentDashboard) {
+      return this.renderAgentDashboard(dashboardState, lastUpdatedFormatted, completedCount)
+    }
+
     if (isEmployeeDashboard) {
-      return this.renderEmployeeDashboard(dashboardState, lastUpdatedFormatted, completedCount)
+      return this.renderEmployeeDashboard(lastUpdatedFormatted)
     }
 
     return (

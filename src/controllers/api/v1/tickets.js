@@ -241,6 +241,118 @@ function calculateAverageCompletionDuration (tickets, resolvedStatusIds) {
   return timeUtils.formatDurationWords(Math.round(total / diffs.length))
 }
 
+function getDashboardVisibleGroupIds (user, callback) {
+  var groupModel = require('../../../models/group')
+  var departmentModel = require('../../../models/department')
+
+  async.waterfall(
+    [
+      function (done) {
+        if (user.role.isAdmin || user.role.isAgent) {
+          departmentModel.getDepartmentGroupsOfUser(user._id, done)
+        } else {
+          groupModel.getAllGroupsOfUserNoPopulate(user._id, done)
+        }
+      },
+      function (groups, done) {
+        if (permissions.canThis(user.role, 'tickets:public')) {
+          groupModel.getAllPublicGroups(function (err, publicGroups) {
+            if (err) return done(err)
+            return done(null, groups.concat(publicGroups))
+          })
+        } else {
+          return done(null, groups)
+        }
+      }
+    ],
+    function (err, groups) {
+      if (err) return callback(err)
+
+      var groupIds = _.chain(groups)
+        .map(function (g) {
+          return g && g._id ? g._id : null
+        })
+        .compact()
+        .uniqBy(function (id) {
+          return id.toString()
+        })
+        .value()
+
+      return callback(null, groupIds)
+    }
+  )
+}
+
+function buildTopFieldCounts (tickets, field, options) {
+  options = options || {}
+  var limit = options.limit || 8
+  var uppercase = options.uppercase === true
+
+  var counts = {}
+
+  _.each(tickets, function (ticket) {
+    var rawValue = ticket && ticket[field] ? String(ticket[field]).trim() : ''
+    if (!rawValue) return
+
+    var value = uppercase ? rawValue.toUpperCase() : rawValue
+    counts[value] = (counts[value] || 0) + 1
+  })
+
+  return _.chain(counts)
+    .map(function (count, name) {
+      return { name: name, count: count }
+    })
+    .orderBy(['count', 'name'], ['desc', 'asc'])
+    .take(limit)
+    .value()
+}
+
+function countUniqueFieldValues (tickets, field, options) {
+  options = options || {}
+  var uppercase = options.uppercase === true
+
+  return _.chain(tickets)
+    .map(function (ticket) {
+      var rawValue = ticket && ticket[field] ? String(ticket[field]).trim() : ''
+      if (!rawValue) return null
+      return uppercase ? rawValue.toUpperCase() : rawValue
+    })
+    .compact()
+    .uniq()
+    .size()
+    .value()
+}
+
+function buildTopFaultBreakdownByField (tickets, field, limit, options) {
+  limit = limit || 10
+  options = options || {}
+  var uppercase = options.uppercase === true
+  var counts = {}
+
+  _.each(tickets, function (ticket) {
+    var name = ticket && ticket[field] ? String(ticket[field]).trim() : ''
+    if (!name) return
+    if (uppercase) name = name.toUpperCase()
+
+    if (!counts[name]) {
+      counts[name] = {
+        name: name,
+        totalCount: 0,
+        yesCount: 0
+      }
+    }
+
+    counts[name].totalCount += 1
+    if (ticket.staffFault === true) counts[name].yesCount += 1
+  })
+
+  return _.chain(counts)
+    .values()
+    .orderBy(['yesCount', 'totalCount', 'name'], ['desc', 'desc', 'asc'])
+    .take(limit)
+    .value()
+}
+
 function buildFilterFromQuery (query) {
   var dateStart = sanitizeQueryValue(query.dateStart || query.startDate || query.ds)
   var dateEnd = sanitizeQueryValue(query.dateEnd || query.endDate || query.de)
@@ -2578,6 +2690,67 @@ apiTickets.getEmployeeOverview = function (req, res) {
       })
     }
   )
+}
+
+apiTickets.getEmployeeDirectoryOverview = function (req, res) {
+  var timespan = req.params.timespan ? parseInt(req.params.timespan) : 30
+  if (_.isNaN(timespan)) timespan = 30
+
+  var user = req.user
+  var TicketSchema = require('../../../models/ticket')
+
+  var today = moment()
+    .hour(23)
+    .minute(59)
+    .second(59)
+  var start = today.clone().subtract(timespan, 'd')
+
+  getDashboardVisibleGroupIds(user, function (err, groupIds) {
+    if (err) return res.status(400).json({ success: false, error: err.message || err })
+
+    var query = {
+      deleted: false,
+      group: { $in: groupIds },
+      date: { $gte: start.toDate(), $lte: today.toDate() }
+    }
+
+    TicketSchema.find(query, 'staffname storeName countryState staffFault')
+      .lean()
+      .exec(function (findErr, tickets) {
+        if (findErr) return res.status(400).json({ success: false, error: findErr.message || findErr })
+
+        var ticketsWithStaffNameCount = _.filter(tickets, function (ticket) {
+          return ticket && ticket.staffname && String(ticket.staffname).trim().length > 0
+        }).length
+        var staffFaultYesCount = _.filter(tickets, function (ticket) {
+          return ticket && ticket.staffFault === true
+        }).length
+        var staffFaultNoCount = _.filter(tickets, function (ticket) {
+          return ticket && ticket.staffFault === false
+        }).length
+
+        var topStaffFaults = buildTopFaultBreakdownByField(tickets, 'staffname', 10)
+        var topStoreFaults = buildTopFaultBreakdownByField(tickets, 'storeName', 10)
+        var topStateFaults = buildTopFaultBreakdownByField(tickets, 'countryState', 10, { uppercase: true })
+
+        return res.json({
+          success: true,
+          timespan: timespan,
+          totalCount: tickets.length,
+          ticketsWithStaffNameCount: ticketsWithStaffNameCount,
+          staffFaultYesCount: staffFaultYesCount,
+          staffFaultNoCount: staffFaultNoCount,
+          uniqueStaffCount: countUniqueFieldValues(tickets, 'staffname'),
+          uniqueStoreCount: countUniqueFieldValues(tickets, 'storeName'),
+          uniqueStateCount: countUniqueFieldValues(tickets, 'countryState', { uppercase: true }),
+          topStaffFaults: topStaffFaults,
+          topStoreFaults: topStoreFaults,
+          topStateFaults: topStateFaults,
+          topStores: buildTopFieldCounts(tickets, 'storeName', { limit: 10 }),
+          topStates: buildTopFieldCounts(tickets, 'countryState', { limit: 10, uppercase: true })
+        })
+      })
+  })
 }
 
 function parseTicketStats (role, tickets, callback) {

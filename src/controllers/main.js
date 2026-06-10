@@ -96,11 +96,12 @@ mainController.about = function (req, res) {
 
 mainController.dashboard = function (req, res) {
   const content = {}
+  const isAgentDashboard = req.path === '/dashboard/agent'
   const isEmployeeDashboard = req.path === '/dashboard/employee'
 
-  content.title = isEmployeeDashboard ? 'Employee Dashboard' : 'Dashboard'
+  content.title = isAgentDashboard ? 'Agent Dashboard' : isEmployeeDashboard ? 'Employee Dashboard' : 'Dashboard'
   content.nav = 'dashboard'
-  content.subnav = isEmployeeDashboard ? 'dashboard-employee' : 'dashboard-tickets'
+  content.subnav = isAgentDashboard ? 'dashboard-agent' : isEmployeeDashboard ? 'dashboard-employee' : 'dashboard-tickets'
 
   content.data = {}
   content.data.user = req.user
