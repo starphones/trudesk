@@ -109,8 +109,15 @@ class Sidebar extends React.Component {
                     active={activeSubItem === 'dashboard-tickets'}
                   />
                   <SubmenuItem
-                    text='Employee Dashboard'
+                    text='Agent Dashboard'
                     icon='groups'
+                    href='/dashboard/agent'
+                    className='no-ajaxy'
+                    active={activeSubItem === 'dashboard-agent'}
+                  />
+                  <SubmenuItem
+                    text='Employee Dashboard'
+                    icon='badge'
                     href='/dashboard/employee'
                     className='no-ajaxy'
                     active={activeSubItem === 'dashboard-employee'}
