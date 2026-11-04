@@ -906,6 +906,8 @@ ticketSchema.statics.getTicketsByDepartments = function (departments, object, ca
 function buildQueryWithObject (SELF, grpId, object, count) {
   const limit = object.limit || 10
   const page = object.page || 0
+  const sortField = { created: 'date', age: 'date', updated: 'updated', store: 'storeName' }[object.sortBy]
+  const sortDirection = (object.sortOrder === 'desc' ? -1 : 1) * (object.sortBy === 'age' ? -1 : 1)
   let _status = object.status
 
   // Check up on status formatting
@@ -932,9 +934,10 @@ function buildQueryWithObject (SELF, grpId, object, count) {
       )
       .populate('assignee', 'username fullname email role image title')
       .populate('type tags status group')
-      .sort({ uid: -1 })
+      .sort(sortField ? { [sortField]: sortDirection, uid: -1 } : { uid: -1 })
   }
 
+  if (!count && object.sortBy === 'store') query.collation({ locale: 'en', strength: 2 })
   // Query with Limit?
   if (limit !== -1) query.skip(page * limit).limit(limit)
   // Status Query
@@ -1004,6 +1007,29 @@ function buildQueryWithObject (SELF, grpId, object, count) {
   return query
 }
 
+async function getTicketsSortedByAssignee (self, query, object) {
+  // Cast the existing permission/filter conditions before using them in an aggregation.
+  query.cast(self)
+  const pipeline = [
+    { $match: query.getFilter() },
+    { $lookup: { from: userSchema.collection.name, localField: 'assignee', foreignField: '_id', as: 'sortAssignee' } },
+    { $addFields: { sortAssignee: { $ifNull: [{ $arrayElemAt: ['$sortAssignee.fullname', 0] }, ''] } } },
+    { $sort: { sortAssignee: object.sortOrder === 'desc' ? -1 : 1, uid: -1 } }
+  ]
+  const limit = object.limit || 10
+  if (limit !== -1) pipeline.push({ $skip: (object.page || 0) * limit }, { $limit: limit })
+  pipeline.push({ $project: { _id: 1 } })
+  const ids = await self.aggregate(pipeline).collation({ locale: 'en', strength: 2 }).exec()
+  if (ids.length === 0) return []
+
+  // Use the regular query to preserve population, getters, and ticket serialization.
+  query.where({ _id: { $in: ids.map(ticket => ticket._id) } })
+  query.setOptions({ skip: 0, limit: 0 })
+  const tickets = await query.exec()
+  const byId = new Map(tickets.map(ticket => [ticket._id.toString(), ticket]))
+  return ids.map(ticket => byId.get(ticket._id.toString())).filter(Boolean)
+}
+
 ticketSchema.statics.getTicketsWithObject = async function (grpId, object, callback) {
   const self = this
   return new Promise((resolve, reject) => {
@@ -1013,6 +1039,12 @@ ticketSchema.statics.getTicketsWithObject = async function (grpId, object, callb
           throw new Error('Invalid parameter in - TicketSchema.GetTicketsWithObject()')
 
         const query = buildQueryWithObject(self, grpId, object)
+
+        if (object.sortBy === 'assignee') {
+          const tickets = await getTicketsSortedByAssignee(self, query, object)
+          if (typeof callback === 'function') return callback(null, tickets)
+          return resolve(tickets)
+        }
 
         if (typeof callback === 'function') return query.exec(callback)
 

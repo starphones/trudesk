@@ -47,6 +47,15 @@ ticketsV2.get = async (req, res) => {
     page
   }
 
+  if (query.sortBy) {
+    if (!['uid', 'created', 'age', 'updated', 'store', 'assignee'].includes(query.sortBy) ||
+        !['asc', 'desc'].includes(query.sortOrder || 'asc')) {
+      return apiUtils.sendApiError_InvalidPostData(res)
+    }
+    queryObject.sortBy = query.sortBy
+    queryObject.sortOrder = query.sortOrder || 'asc'
+  }
+
   try {
     let groups = []
     if (req.user.role.isAdmin || req.user.role.isAgent) {
