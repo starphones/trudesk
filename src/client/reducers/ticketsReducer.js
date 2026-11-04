@@ -35,6 +35,8 @@ const initialState = {
   priorities: List([]),
   totalCount: '',
   viewType: 'active',
+  sortBy: 'uid',
+  sortOrder: 'desc',
   loading: false,
   nextPage: 1,
   prevPage: 0
@@ -79,6 +81,8 @@ const reducer = handleActions(
       return {
         ...state,
         viewType: action.payload.type,
+        sortBy: action.payload.sortBy || 'uid',
+        sortOrder: action.payload.sortOrder || 'desc',
         loading: true
       }
     },

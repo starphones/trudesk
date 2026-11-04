@@ -17,10 +17,11 @@ import PropTypes from 'prop-types'
 
 class TableHeader extends React.Component {
   render () {
-    const { width, height, padding, textAlign, text, component } = this.props
+    const { width, height, padding, textAlign, text, component, onSort, sortDirection } = this.props
 
     return (
       <th
+        aria-sort={onSort ? sortDirection || 'none' : undefined}
         style={{
           width: width,
           padding: padding,
@@ -32,7 +33,33 @@ class TableHeader extends React.Component {
         }}
       >
         {component}
-        {text}
+        {onSort ? (
+          <button
+            type='button'
+            onClick={onSort}
+            aria-label={`${text}: sort ${sortDirection === 'ascending' ? 'descending' : 'ascending'}`}
+            style={{
+              background: 'none',
+              border: 0,
+              padding: 0,
+              color: 'inherit',
+              font: 'inherit',
+              textTransform: 'inherit',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            {text}
+            <span aria-hidden='true' style={{ display: 'inline-flex', flexDirection: 'column', fontSize: 9, lineHeight: 1 }}>
+              <span style={{ opacity: sortDirection === 'ascending' ? 1 : 0.35 }}>▲</span>
+              <span style={{ opacity: sortDirection === 'descending' ? 1 : 0.35 }}>▼</span>
+            </span>
+          </button>
+        ) : (
+          text
+        )}
       </th>
     )
   }
@@ -44,6 +71,8 @@ TableHeader.propTypes = {
   padding: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   textAlign: PropTypes.string,
   text: PropTypes.string,
+  onSort: PropTypes.func,
+  sortDirection: PropTypes.oneOf(['ascending', 'descending']),
   component: PropTypes.oneOfType([PropTypes.element, PropTypes.func])
 }
 

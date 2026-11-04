@@ -69,6 +69,43 @@ class TicketsContainer extends React.Component {
     return ticket.get('updated') || ticket.get('date')
   }
 
+  getTicketAge (date, now = moment()) {
+    if (!date) return '--'
+    const timezone = helpers.getTimezone()
+    const created = moment(date).tz(timezone).startOf('day')
+    if (!created.isValid()) return '--'
+
+    const days = Math.max(0, now.clone().tz(timezone).startOf('day').diff(created, 'days'))
+    if (days === 0) return 'Today'
+    if (days === 1) return 'Yesterday'
+    return `${days} days ago`
+  }
+
+  fetchCurrentTickets (sortBy = this.props.sortBy, sortOrder = this.props.sortOrder) {
+    return this.props.fetchTickets({
+      limit: 50,
+      page: this.props.page,
+      type: this.props.view,
+      filter: this.props.filter,
+      sortBy,
+      sortOrder
+    })
+  }
+
+  sortHeader (field) {
+    return {
+      onSort: () => {
+        this._clearChecked()
+        this.fetchCurrentTickets(field,
+          this.props.sortBy === field && this.props.sortOrder === 'asc' ? 'desc' : 'asc')
+      },
+      sortDirection:
+        this.props.sortBy === field
+          ? (this.props.sortOrder === 'asc' ? 'ascending' : 'descending')
+          : undefined
+    }
+  }
+
   loadSeenMap () {
     try {
       const raw = localStorage.getItem(this.seenStorageKey)
@@ -112,7 +149,7 @@ class TicketsContainer extends React.Component {
     this.props.socket.on('$trudesk:client:ticket:updated', this.onTicketUpdated)
     this.props.socket.on('$trudesk:client:ticket:deleted', this.onTicketDeleted)
 
-    this.props.fetchTickets({ limit: 50, page: this.props.page, type: this.props.view, filter: this.props.filter })
+    this.fetchCurrentTickets()
     this.props.fetchTicketStatus()
   }
 
@@ -152,14 +189,17 @@ class TicketsContainer extends React.Component {
   }
 
   onTicketCreated (ticket) {
+    if (this.props.sortBy !== 'uid') return this.fetchCurrentTickets()
     if (this.props.page === '0') this.props.ticketEvent({ type: 'created', data: ticket })
   }
 
   onTicketUpdated (data) {
+    if (this.props.sortBy !== 'uid') return this.fetchCurrentTickets()
     this.props.ticketUpdated(data)
   }
 
   onTicketDeleted (id) {
+    if (this.props.sortBy !== 'uid') return this.fetchCurrentTickets()
     this.props.ticketEvent({ type: 'deleted', data: id })
   }
 
@@ -255,7 +295,7 @@ class TicketsContainer extends React.Component {
     const loadingItems = []
     for (let i = 0; i < 51; i++) {
       const cells = []
-      for (let k = 0; k < 10; k++) {
+      for (let k = 0; k < 12; k++) {
         cells.push(
           <TableCell key={k} className={'vam'}>
             <div className={'loadingTextAnimation'} />
@@ -310,7 +350,7 @@ class TicketsContainer extends React.Component {
                     e.preventDefault()
                     this.props
                       .unloadTickets()
-                      .then(this.props.fetchTickets({ type: this.props.view, page: this.props.page }))
+                      .then(() => this.fetchCurrentTickets())
                   }}
                 />
                 <PageTitleButton
@@ -373,18 +413,19 @@ class TicketsContainer extends React.Component {
               <TableHeader key={1} width={80} text={'Status'} />,
               <TableHeader key={2} width={65} text={'#'} />,
               <TableHeader key={3} width={'23%'} text={'Subject'} />,
-              <TableHeader key={4} width={110} text={'Created'} />,
+              <TableHeader key={4} width={110} text={'Created'} {...this.sortHeader('created')} />,
+              <TableHeader key={'age'} width={110} text={'Age'} {...this.sortHeader('age')} />,
               <TableHeader key={5} width={125} text={'Requester'} />,
               <TableHeader key={6} text={'Staff'} />,
               <TableHeader key={7} text={'City'} />,
-              <TableHeader key={8} text={'Store'} />,
-              <TableHeader key={9} text={'Assignee'} />,
-              <TableHeader key={10} text={'Updated'} />
+              <TableHeader key={8} text={'Store'} {...this.sortHeader('store')} />,
+              <TableHeader key={9} text={'Assignee'} {...this.sortHeader('assignee')} />,
+              <TableHeader key={10} text={'Updated'} {...this.sortHeader('updated')} />
             ]}
           >
             {!this.props.loading && this.props.tickets.size < 1 && (
               <TableRow clickable={false}>
-                <TableCell colSpan={11}>
+                <TableCell colSpan={12}>
                   <h5 style={{ margin: 10 }}>No Tickets Found</h5>
                 </TableCell>
               </TableRow>
@@ -471,6 +512,9 @@ class TicketsContainer extends React.Component {
                     <TableCell className={'vam nbb'}>
                       {helpers.formatDate(ticket.get('date'), helpers.getShortDateFormat())}
                     </TableCell>
+                    <TableCell className={'vam nbb'} style={{ whiteSpace: 'nowrap' }}>
+                      {this.getTicketAge(ticket.get('date'))}
+                    </TableCell>
                     <TableCell className={'vam nbb'}>{ticket.getIn(['owner', 'fullname'])}</TableCell>
                     <TableCell className={'vam nbb'}>{staffName}</TableCell>
                     <TableCell className={'vam nbb'}>{city}</TableCell>
@@ -490,6 +534,8 @@ class TicketsContainer extends React.Component {
 }
 
 TicketsContainer.propTypes = {
+  sortBy: PropTypes.string.isRequired,
+  sortOrder: PropTypes.string.isRequired,
   socket: PropTypes.object.isRequired,
   view: PropTypes.string.isRequired,
   page: PropTypes.string.isRequired,
@@ -521,6 +567,8 @@ TicketsContainer.defaultProps = {
 }
 
 const mapStateToProps = state => ({
+  sortBy: state.ticketsState.sortBy,
+  sortOrder: state.ticketsState.sortOrder,
   tickets: state.ticketsState.tickets,
   totalCount: state.ticketsState.totalCount,
   prevPage: state.ticketsState.prevPage,
