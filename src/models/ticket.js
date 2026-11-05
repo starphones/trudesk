@@ -906,7 +906,14 @@ ticketSchema.statics.getTicketsByDepartments = function (departments, object, ca
 function buildQueryWithObject (SELF, grpId, object, count) {
   const limit = object.limit || 10
   const page = object.page || 0
-  const sortField = { created: 'date', age: 'date', updated: 'updated', store: 'storeName' }[object.sortBy]
+  const sortField = {
+    created: 'date',
+    age: 'date',
+    updated: 'updated',
+    store: 'storeName',
+    staff: 'staffname',
+    city: 'countryState'
+  }[object.sortBy]
   const sortDirection = (object.sortOrder === 'desc' ? -1 : 1) * (object.sortBy === 'age' ? -1 : 1)
   let _status = object.status
 
@@ -937,7 +944,7 @@ function buildQueryWithObject (SELF, grpId, object, count) {
       .sort(sortField ? { [sortField]: sortDirection, uid: -1 } : { uid: -1 })
   }
 
-  if (!count && object.sortBy === 'store') query.collation({ locale: 'en', strength: 2 })
+  if (!count && ['store', 'staff', 'city'].includes(object.sortBy)) query.collation({ locale: 'en', strength: 2 })
   // Query with Limit?
   if (limit !== -1) query.skip(page * limit).limit(limit)
   // Status Query
@@ -1007,14 +1014,20 @@ function buildQueryWithObject (SELF, grpId, object, count) {
   return query
 }
 
-async function getTicketsSortedByAssignee (self, query, object) {
+async function getTicketsSortedByReference (self, query, object) {
+  const references = {
+    assignee: { collection: userSchema.collection.name, field: 'assignee', label: 'fullname' },
+    requester: { collection: userSchema.collection.name, field: 'owner', label: 'fullname' },
+    status: { collection: statusSchema.collection.name, field: 'status', label: 'name' }
+  }
+  const reference = references[object.sortBy]
   // Cast the existing permission/filter conditions before using them in an aggregation.
   query.cast(self)
   const pipeline = [
     { $match: query.getFilter() },
-    { $lookup: { from: userSchema.collection.name, localField: 'assignee', foreignField: '_id', as: 'sortAssignee' } },
-    { $addFields: { sortAssignee: { $ifNull: [{ $arrayElemAt: ['$sortAssignee.fullname', 0] }, ''] } } },
-    { $sort: { sortAssignee: object.sortOrder === 'desc' ? -1 : 1, uid: -1 } }
+    { $lookup: { from: reference.collection, localField: reference.field, foreignField: '_id', as: 'sortReference' } },
+    { $addFields: { sortReference: { $ifNull: [{ $arrayElemAt: [`$sortReference.${reference.label}`, 0] }, ''] } } },
+    { $sort: { sortReference: object.sortOrder === 'desc' ? -1 : 1, uid: -1 } }
   ]
   const limit = object.limit || 10
   if (limit !== -1) pipeline.push({ $skip: (object.page || 0) * limit }, { $limit: limit })
@@ -1040,8 +1053,8 @@ ticketSchema.statics.getTicketsWithObject = async function (grpId, object, callb
 
         const query = buildQueryWithObject(self, grpId, object)
 
-        if (object.sortBy === 'assignee') {
-          const tickets = await getTicketsSortedByAssignee(self, query, object)
+        if (['assignee', 'requester', 'status'].includes(object.sortBy)) {
+          const tickets = await getTicketsSortedByReference(self, query, object)
           if (typeof callback === 'function') return callback(null, tickets)
           return resolve(tickets)
         }

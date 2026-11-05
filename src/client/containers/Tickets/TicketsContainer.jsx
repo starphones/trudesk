@@ -410,14 +410,14 @@ class TicketsContainer extends React.Component {
             striped={true}
             headers={[
               <TableHeader key={0} width={45} height={50} component={selectAllCheckbox} />,
-              <TableHeader key={1} width={80} text={'Status'} />,
+              <TableHeader key={1} width={80} text={'Status'} {...this.sortHeader('status')} />,
               <TableHeader key={2} width={65} text={'#'} />,
               <TableHeader key={3} width={'23%'} text={'Subject'} />,
               <TableHeader key={4} width={110} text={'Created'} {...this.sortHeader('created')} />,
               <TableHeader key={'age'} width={110} text={'Age'} {...this.sortHeader('age')} />,
-              <TableHeader key={5} width={125} text={'Requester'} />,
-              <TableHeader key={6} text={'Staff'} />,
-              <TableHeader key={7} text={'City'} />,
+              <TableHeader key={5} width={125} text={'Requester'} {...this.sortHeader('requester')} />,
+              <TableHeader key={6} text={'Staff'} {...this.sortHeader('staff')} />,
+              <TableHeader key={7} text={'City'} {...this.sortHeader('city')} />,
               <TableHeader key={8} text={'Store'} {...this.sortHeader('store')} />,
               <TableHeader key={9} text={'Assignee'} {...this.sortHeader('assignee')} />,
               <TableHeader key={10} text={'Updated'} {...this.sortHeader('updated')} />
