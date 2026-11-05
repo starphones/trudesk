@@ -23,6 +23,7 @@ module.exports = {
   },
   output: {
     filename: '[name].js',
+    chunkFilename: '[name].[contenthash:12].js',
     path: path.resolve(__dirname, 'public/js'),
     publicPath: '/js/'
   },
@@ -144,8 +145,8 @@ module.exports = {
     ]
   },
   optimization: {
-    chunkIds: 'total-size',
-    moduleIds: 'size',
+    chunkIds: 'deterministic',
+    moduleIds: 'deterministic',
     minimizer: [
       new TerserPlugin({
         parallel: true,
