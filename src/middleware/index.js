@@ -56,6 +56,14 @@ module.exports = function (app, db, callback) {
   app.use(bodyParser.json({ limit: '2mb' }))
   app.use(cookieParser())
 
+  // These entry filenames stay fixed and must always match the current hashed chunks.
+  app.use(function (req, res, next) {
+    if (/^\/js\/(vendor|trudesk\.min|truRequire)\.js(\.gz)?$/.test(req.path)) {
+      res.setHeader('Cache-Control', 'no-store')
+    }
+    next()
+  })
+
   if (global.env === 'production') {
     app.use(
       expressStaticGzip(path.join(__dirname, '../../public'), {
