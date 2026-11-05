@@ -48,7 +48,7 @@ ticketsV2.get = async (req, res) => {
   }
 
   if (query.sortBy) {
-    if (!['uid', 'created', 'age', 'updated', 'store', 'assignee'].includes(query.sortBy) ||
+    if (!['uid', 'created', 'age', 'updated', 'store', 'assignee', 'status', 'staff', 'requester', 'city'].includes(query.sortBy) ||
         !['asc', 'desc'].includes(query.sortOrder || 'asc')) {
       return apiUtils.sendApiError_InvalidPostData(res)
     }
