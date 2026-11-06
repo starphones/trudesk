@@ -74,6 +74,7 @@ ticketsV2.get = async (req, res) => {
       case 'active':
         queryObject.status = statuses
           .filter(i => !escalatedStatus || i._id.toString() !== escalatedStatus._id.toString())
+          .filter(i => !/^permanently\s+closed$/i.test(i.name.trim()))
           .map(i => i._id.toString())
         break
       case 'assigned':

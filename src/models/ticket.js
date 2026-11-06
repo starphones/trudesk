@@ -918,7 +918,7 @@ function buildQueryWithObject (SELF, grpId, object, count) {
   let _status = object.status
 
   // Check up on status formatting
-  if (_.isArray(_status)) {
+  if (_.isArray(_status) && _status.length > 0) {
     // This is a hack - querystring adds status in the array as [ "1,2,3" ]
     // This will convert the array to [ "1", "2", "3" ]
     _status = _.join(_status, ',').split(',')
@@ -948,7 +948,7 @@ function buildQueryWithObject (SELF, grpId, object, count) {
   // Query with Limit?
   if (limit !== -1) query.skip(page * limit).limit(limit)
   // Status Query
-  if (_.isArray(_status) && _status.length > 0) {
+  if (_.isArray(_status)) {
     query.where({ status: { $in: _status } })
   }
 

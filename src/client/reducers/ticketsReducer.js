@@ -57,7 +57,9 @@ function hasInView (state, view, statusId, assignee, userId, userGroupIds, group
       hasView = state.ticketStatuses.findIndex(s => s.get('_id') === statusId) !== -1
       break
     case 'active':
-      hasView = unresolvedStatuses.findIndex(s => s.get('_id') === statusId) !== -1
+      hasView = unresolvedStatuses.findIndex(s =>
+        s.get('_id') === statusId && !/^permanently\s+closed$/i.test((s.get('name') || '').trim())
+      ) !== -1
       break
     case 'assigned':
       hasView = assignee === userId
